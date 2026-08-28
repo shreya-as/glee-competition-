@@ -1,0 +1,53 @@
+(venv) fm-pc-lt-352@latitude:~/Documents/personal-project/glee$ python3 baseline.py --family negotiation --last 100
+python3 baseline.py --family bargaining --last 100
+python3 baseline.py --family persuasion --last 100
+=== negotiation ===
+Total games:     100
+Successful:      47
+Failed:          53
+$0 games:        56
+Average payoff:  $30,273
+Total payoff:    $3,027,323
+
+=== bargaining ===
+Total games:     100
+Successful:      93
+Failed:          7
+$0 games:        7
+Average payoff:  $150,697
+Total payoff:    $15,069,673
+
+=== persuasion ===
+Total games:     100
+Successful:      33
+Failed:          67
+$0 games:        67
+Average payoff:  $1,269,713
+Total payoff:    $126,971,300
+
+(venv) fm-pc-lt-352@latitude:~/Documents/personal-project/glee$ python3 baseline.py --family negotiation --last 200
+python3 baseline.py --family bargaining --last 200
+python3 baseline.py --family persuasion --last 200
+=== negotiation ===
+Total games:     200
+Successful:      98
+Failed:          102
+$0 games:        108
+Average payoff:  $27,902
+Total payoff:    $5,580,423
+
+=== bargaining ===
+Total games:     200
+Successful:      190
+Failed:          10
+$0 games:        10
+Average payoff:  $156,170
+Total payoff:    $31,234,041
+
+=== persuasion ===
+Total games:     200
+Successful:      64
+Failed:          136
+$0 games:        136
+Average payoff:  $1,307,382
+Total payoff:    $261,476,400
