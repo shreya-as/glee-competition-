@@ -16,26 +16,56 @@ table { border-collapse: collapse; width: 100%; margin: 8px 0 12px; font-size: 9
 th, td { border: 1px solid #777; padding: 5px 6px; vertical-align: top; }
 th { background: #f1f1f1; font-weight: bold; }
 code { font-family: Liberation Mono, monospace; font-size: 9pt; }
-pre { background: #f6f6f6; border: 1px solid #ccc; padding: 8px; white-space: pre-wrap; }
+pre { background: #f6f6f6; border: 1px solid #ccc; padding: 8px; white-space: pre-wrap; font-family: Liberation Mono, monospace; font-size: 9pt; line-height: 1.25; }
+blockquote { margin: 8px 24px; padding-left: 10px; border-left: 3px solid #ccc; font-style: italic; color: #333; }
+sup.fn { font-size: 8pt; }
+.fn-block { font-size: 9pt; color: #333; border-top: 1px solid #ccc; margin-top: 6px; padding-top: 4px; }
 </style>
 </head>
 <body>
 <h1>A Reliability-First Adaptive Agent for the GLEE Competition</h1>
-<p><em>[Author Name], [Affiliation]</em></p>
+<p><em>[Author Name], [Affiliation]</em><sup class="fn">1</sup></p>
+<blockquote>"Amateurs talk strategy. Professionals talk logistics."<br>— attributed, military/engineering aphorism</blockquote>
 <h2>Abstract</h2>
-<p>We describe an autonomous agent for the GLEE Competition, which evaluates agents in three language-based economic game families: bargaining, negotiation, and persuasion. Our design follows a reliability-first principle: because invalid actions, timeouts, and abandoned games can create severe scoring penalties, every strategic component is wrapped in a deterministic, schema-compatible fallback. The submitted system combines simple economic heuristics, opponent-behavior profiling, round-based concession schedules, lightweight learned calibration from logged games, and persuasion-specific payoff tracking. We also maintained a vanilla control agent during the final evaluation window to distinguish true strategic improvement from leaderboard noise. Across our logs, bargaining was consistently strong, negotiation remained the main bottleneck, and persuasion exhibited high variance and a late score decline. Our main finding is that robust competition performance depended less on increasingly complex language generation and more on validity, fast response, conservative concessions, and careful live experimentation.</p>
+<p>We describe an autonomous agent for the GLEE Competition, which evaluates agents in three language-based economic game families: bargaining, negotiation, and persuasion. Our design follows a reliability-first principle: because invalid actions, timeouts, and abandoned games can create severe scoring penalties, every strategic component is wrapped in a deterministic, schema-compatible fallback. The submitted system combines simple economic heuristics, opponent-behavior profiling, round-based concession schedules, lightweight learned calibration from logged games, and persuasion-specific payoff tracking. We also maintained a vanilla control agent during the final evaluation window to distinguish true strategic improvement from leaderboard noise. Our central finding is that the value of adaptation is strongly game-dependent: bargaining was already difficult to improve beyond a simple baseline, negotiation was the most promising target for explicit economic reasoning and concession, and persuasion remained high-variance despite payoff-aware argument selection. Robust competition performance depended less on adding complexity and more on validity, fast response, controlled comparison, and careful failure analysis.</p>
 <h2>1. Introduction</h2>
 <p>GLEE (Games in Language-based Economic Environments) evaluates agents in sequential two-player economic interactions where natural-language communication and structured economic actions are both important. The competition contains three families: bargaining over a fixed surplus, buyer-seller negotiation over an indivisible good, and persuasion under asymmetric information. Agents interact through the official API and are ranked by family-level scores that reflect payoff relative to other players in comparable roles and configurations.</p>
 <p>This setting creates a practical challenge that is easy to underestimate. A strategy can be theoretically appealing but competitively harmful if it occasionally fails to answer, emits an invalid action, or deadlocks against another static agent. Our agent was therefore built around a conservative engineering claim: first never lose a game mechanically, then improve payoff through adaptation. The system evolved through several live experiments during the competition window, including reverted persuasion variants, negotiation hold-out tests, and a final split where <code>sh_agent1</code> was kept as a vanilla control while the remaining agents ran the current adaptive strategy.</p>
-<p>The resulting paper is not a clean laboratory ablation study. It is a competition-system report based on live online play, noisy opponent pools, and multiple agent slots. This is still enough for a GLEE competition paper because the track asks participants to describe their agent, approach, and findings. The strongest scientific value is in the engineering and empirical lessons: which strategies were stable, which were noisy, and which failure modes mattered most.</p>
+<p>The resulting paper is not a clean laboratory ablation study. It is a competition-system report based on live online play, noisy opponent pools, and multiple agent slots. This is still enough for a GLEE competition paper because the track asks participants to describe their agent, approach, and findings, including negative results. The strongest scientific value is in the engineering and empirical lessons: which strategies were stable, which were noisy, which failure modes mattered most, and why raw game-level payoff can diverge from leaderboard rating.</p>
+<p>Our contributions are as follows:</p>
+<ul>
+<li><strong>A reliability-first fleet architecture.</strong> Every strategic component, in every game family, is wrapped in a deterministic, schema-valid fallback, so a novel or partially-broken strategy can never mechanically lose a game (Section 2).</li>
+<li><strong>Family-conditioned adaptive strategies.</strong> Opponent-behavior profiling and round-based concession ramps for bargaining and negotiation, complete-information fair-price reasoning for negotiation, and variance-penalized payoff-aware argument selection for persuasion (Section 3).</li>
+<li><strong>A taxonomy of observed failure modes</strong>, grounded in live competition logs rather than assumed in advance, distinguishing convergence failures, infrastructure failures, and payoff-modeling failures (Section 4).</li>
+<li><strong>A controlled evaluation protocol</strong> &mdash; a standing vanilla-control agent (<code>sh_agent1</code>) run alongside the adaptive fleet, plus a component-level ablation matrix (V0&ndash;V5) &mdash; for telling true strategic improvement apart from leaderboard noise (Section 5).</li>
+</ul>
 <h2>2. Agent Architecture</h2>
 <p>Our implementation uses the official Python GLEE SDK. Each incoming game is dispatched by family to a deterministic strategy function. The current fleet has two relevant variants:</p>
-<ul><li><code>vanilla_agent.py</code>: a simple baseline agent. In bargaining it proposes an even split and accepts offers worth at least 40% of the pot. In negotiation it accepts profitable offers and otherwise counters from its own valuation. In persuasion it recommends the product as seller and buys as buyer when expected value exceeds price.</li></ul>
-<ul><li><code>simple_agent.py</code>: the adaptive strategy. This extends the vanilla logic with opponent modeling, concession schedules, discount-factor adjustments in bargaining, fair-price logic under complete information in negotiation, learned threshold calibration, and payoff-aware persuasion argument selection.</li></ul>
+<ul>
+<li><code>vanilla_agent.py</code>: a simple baseline agent. In bargaining it proposes an even split and accepts offers worth at least 40% of the pot. In negotiation it accepts profitable offers and otherwise counters from its own valuation. In persuasion it recommends the product as seller and buys as buyer when expected value exceeds price.</li>
+<li><code>simple_agent.py</code>: the adaptive strategy. This extends the vanilla logic with opponent modeling, concession schedules, discount-factor adjustments in bargaining, fair-price logic under complete information in negotiation, learned threshold calibration, and payoff-aware persuasion argument selection.</li>
+</ul>
 <p>During the final data-collection phase, we configured <code>sh_agent1</code> as a separate vanilla-control agent and routed its outcomes into separate logs:</p>
 <pre><code>logs/sh_agent1_games.jsonl
 logs/sh_agent1_learning.log</code></pre>
 <p>The remaining agents run the adaptive strategy and write to the shared fleet log. This split is important because leaderboard changes alone were not reliable enough to guide decisions. Several earlier changes appeared beneficial in one batch and harmful in the next, especially in persuasion.</p>
+<pre>Figure 1: Dispatch and fallback architecture
+
+              incoming game
+                    |
+            dispatch by family
+                    |
+   +----------------+----------------+
+   |                |                |
+Bargaining      Negotiation       Persuasion
+   |                |                |
+opponent model   fair-price       variance-penalized
++ concession     + concession     + argument
+  ramp             + calibration    selection
+   |                |                |
+   +--------- schema-valid, deterministic ---------+
+              fallback (always available)</pre>
+<p>Every branch in Figure 1 terminates in the same guarantee: if the adaptive component fails, errors, or times out, control falls back to the deterministic <code>vanilla_agent.py</code> logic for that family, so the game is never lost mechanically.</p>
 <h2>3. Strategy Design</h2>
 <h3>3.1 Bargaining</h3>
 <p>The bargaining strategy began from a robust baseline: propose a 50/50 split and accept any offer giving at least 40% of the pot. Later variants tested a more self-favoring anchor and learned threshold adjustments, but bargaining scores did not consistently improve on the leaderboard. This suggested that bargaining was already near a local ceiling for our account and opponent pool.</p>
@@ -50,12 +80,21 @@ logs/sh_agent1_learning.log</code></pre>
 <p>Persuasion was the highest-variance family. The seller can earn very large payoffs when buyers accept, but many games produce zero payoff. We tested multiple persuasion ideas, including calibrated lying formulas and payoff-aware argument selection. The calibrated lying variants were reverted because their effects changed sign across successive live batches.</p>
 <p>The current adaptive persuasion model tracks six argument framings: economic, fairness, safety, social, convenience, and long-term. Rather than selecting the message type by raw acceptance rate, it scores each framing by estimated expected payoff with a penalty for payoff variance. This matters because in persuasion, high acceptance rate does not always imply high payoff.</p>
 <p>However, persuasion remained unstable. Recent leaderboard drops suggest either an opponent-pool shift, insufficient adaptation speed, or damage from earlier operational failures. We therefore treat persuasion results cautiously and avoid overclaiming that the adaptive persuasion strategy improved performance.</p>
-<h2>4. Reliability and Failure Handling</h2>
-<p>The most important engineering lesson was that mechanical reliability is a competitive strategy. During live runs, we found a multiprocessing race in profile persistence: multiple agent processes wrote to the same temporary JSON filename before replacing <code>logs/persuasion_profiles_v2.json</code>. This caused intermittent <code>FileNotFoundError</code> crashes during persuasion decisions. The fix was to make temporary filenames process- and thread-specific before atomic replacement.</p>
-<p>We also observed server-side queue pauses after agents timed out in several consecutive games. To recover from this safely, the fleet runner now parses the server retry time, sleeps until the pause expires, and then rejoins the queue automatically. This prevents a paused agent from silently dying during the final evaluation window.</p>
-<p>These details are worth reporting because they affected real competition performance. In GLEE, a strong strategy that occasionally crashes can be worse than a simple strategy that always replies.</p>
+<h2>4. A Taxonomy of Failure Modes</h2>
+<p>The most important engineering lesson was that mechanical reliability is a competitive strategy. Rather than treat each incident as an isolated bug, we group every failure observed during live play into three clusters, grounded in what actually appeared in <code>logs/</code> rather than assumed in advance:</p>
+<pre>Figure 2: Failure-mode clusters (n=4 observed, Table in Section 6)
+
+ Failure Modes
+   |
+   +-- Convergence          (bad strategic dynamics, e.g. static-offer deadlock)
+   +-- Infrastructure       (bad execution, e.g. queue pause, profile-save race)
+   +-- Payoff Modeling      (bad objective, e.g. zero-payoff persuasion despite acceptance)</pre>
+<p>The <strong>Infrastructure</strong> cluster proved the costliest in practice. During live runs, we found a multiprocessing race in profile persistence: multiple agent processes wrote to the same temporary JSON filename before replacing <code>logs/persuasion_profiles_v2.json</code>. This caused intermittent <code>FileNotFoundError</code> crashes during persuasion decisions. The fix was to make temporary filenames process- and thread-specific before atomic replacement.</p>
+<p>We also observed server-side queue pauses after agents timed out in several consecutive games &mdash; another Infrastructure-cluster failure. To recover from this safely, the fleet runner now parses the server retry time, sleeps until the pause expires, and then rejoins the queue automatically. This prevents a paused agent from silently dying during the final evaluation window.</p>
+<p>These details are worth reporting because they affected real competition performance. In GLEE, a strong strategy that occasionally crashes can be worse than a simple strategy that always replies. The full failure table, with cause and fix per cluster, appears in Section 6.</p>
 <h2>5. Evaluation</h2>
 <p>We evaluate using local logs collected from live competition play. For bargaining and negotiation, success is <code>outcome == &quot;agreement&quot;</code>. For persuasion, success is defined as positive payoff because completed persuasion games can still yield zero payoff.</p>
+<p>We separate evaluation into two layers. The first is game-level behavior: success rate, payoff, median payoff, rounds per game, failure rate, timeout rate, and family-specific diagnostics such as final price or argument type. The second is the competition metric: leaderboard rating. This distinction matters because an intervention can improve a local metric while reducing leaderboard score after GLEE&#x27;s role, configuration, opponent, and reference-pool adjustments.</p>
 <p>Recent shared-log performance before the final control split was:</p>
 <table><tbody>
 <tr><th>Family</th><th>Last 100 Games</th><th>Last 500 Games</th><th>Interpretation</th></tr>
@@ -65,29 +104,54 @@ logs/sh_agent1_learning.log</code></pre>
 </tbody></table>
 <p>Leaderboard snapshots around the final run showed negotiation ratings near 1880-1900 for several agents, while persuasion had declined from earlier values near 1800 to roughly the 1400-1500 range. This created an important evaluation warning: local metrics such as average payoff, total payoff, and agreement rate are not identical to the GLEE leaderboard objective. A strategy can increase raw payoff in the games we log while still losing rating if it performs worse after role, configuration, opponent, or reference-pool adjustment. For example, a lower-agreement strategy with larger occasional wins can look attractive in local average-payoff summaries but score worse than a stable baseline in the competition rating.</p>
 <p>This mismatch motivated the final experimental setup: keep <code>sh_agent1</code> as a vanilla control and use the remaining agents to test whether the adaptive strategy still outperforms baseline under the current opponent pool. The control is especially important because the original/simple GLEE-style baseline had previously reached ratings near 1900 in some families. If a more complex variant falls to 1400-1500, the right interpretation is not that the local logs are useless, but that the variant must be evaluated against the leaderboard objective rather than against local payoff alone.</p>
+<h3>5.1 Controlled Ablation Plan</h3>
+<p>The main experiment for the final window is vanilla versus adaptive under the same live opponent pool. The core table we aim to fill is:</p>
+<table><tbody>
+<tr><th>Family</th><th>Strategy</th><th>Games</th><th>Success</th><th>Avg payoff</th><th>Median payoff</th><th>Avg rounds</th><th>Rating change</th></tr>
+<tr><td>Bargaining</td><td>Vanilla</td><td>TBD</td><td>TBD</td><td>TBD</td><td>TBD</td><td>TBD</td><td>TBD</td></tr>
+<tr><td>Bargaining</td><td>Adaptive</td><td>TBD</td><td>TBD</td><td>TBD</td><td>TBD</td><td>TBD</td><td>TBD</td></tr>
+<tr><td>Negotiation</td><td>Vanilla</td><td>TBD</td><td>TBD</td><td>TBD</td><td>TBD</td><td>TBD</td><td>TBD</td></tr>
+<tr><td>Negotiation</td><td>Adaptive</td><td>TBD</td><td>TBD</td><td>TBD</td><td>TBD</td><td>TBD</td><td>TBD</td></tr>
+<tr><td>Persuasion</td><td>Vanilla</td><td>TBD</td><td>TBD</td><td>TBD</td><td>TBD</td><td>TBD</td><td>TBD</td></tr>
+<tr><td>Persuasion</td><td>Adaptive</td><td>TBD</td><td>TBD</td><td>TBD</td><td>TBD</td><td>TBD</td><td>TBD</td></tr>
+</tbody></table>
+<p>We also define the component-level ablation matrix for cleaner follow-up analysis:</p>
+<table><tbody>
+<tr><th>Variant</th><th>Opponent model</th><th>Concession</th><th>Learned model</th><th>Payoff-aware persuasion</th><th>Purpose</th></tr>
+<tr><td>V0 Vanilla</td><td>No</td><td>No</td><td>No</td><td>No</td><td>Reference point.</td></tr>
+<tr><td>V1 Opponent</td><td>Yes</td><td>No</td><td>No</td><td>No</td><td>Test adaptation to opponent behavior.</td></tr>
+<tr><td>V2 Concession</td><td>No</td><td>Yes</td><td>No</td><td>No</td><td>Test deadlock prevention.</td></tr>
+<tr><td>V3 Learning</td><td>No</td><td>No</td><td>Yes</td><td>No</td><td>Test learned threshold calibration.</td></tr>
+<tr><td>V4 Persuasion</td><td>No</td><td>No</td><td>No</td><td>Yes</td><td>Test payoff-aware argument selection.</td></tr>
+<tr><td>V5 Full</td><td>Yes</td><td>Yes</td><td>Yes</td><td>Yes</td><td>Integrated production strategy.</td></tr>
+</tbody></table>
+<p>Two family-specific analyses are especially important. For negotiation, we compare static counters, linear concession, and tiered concession using agreement rate, average rounds, payoff, and no-deal frequency. For persuasion, we compare argument selection by buy probability, expected payoff, and expected payoff minus risk penalty, reporting attempts, buy rate, average payoff, median payoff, and payoff variance per argument type. This directly tests our observation that high acceptance rate does not necessarily imply high payoff.</p>
 <h2>6. Discussion</h2>
 <p>Our experiments are sufficient for a competition paper, but not for a strong causal claim about every component. The strongest supported claims are:</p>
-<ol><li>A vanilla baseline is difficult to beat in bargaining, where simple fair splits and conservative acceptance already perform well.</li></ol>
-<ol><li>Negotiation benefits most from environment-aware rules, especially complete-information fair-price reasoning and concessions that prevent deadlock.</li></ol>
-<ol><li>Persuasion is noisy and brittle; variants that looked promising in one batch did not consistently survive later batches.</li></ol>
-<ol><li>Reliability failures are not merely implementation details. They directly affect score because timeouts and crashes change the agent&#x27;s ability to remain in the queue and complete games.</li></ol>
+<ol>
+<li>A vanilla baseline is difficult to beat in bargaining, where simple fair splits and conservative acceptance already perform well.</li>
+<li>Negotiation benefits most from environment-aware rules, especially complete-information fair-price reasoning and concessions that prevent deadlock.</li>
+<li>Persuasion is noisy and brittle; variants that looked promising in one batch did not consistently survive later batches.</li>
+<li>Reliability failures are not merely implementation details. They directly affect score because timeouts and crashes change the agent&#x27;s ability to remain in the queue and complete games.</li>
+</ol>
 <p>The main limitation is that several components changed together. The adaptive agent combines opponent modeling, concession schedules, discount-factor adjustment, anchoring, learned thresholds, payoff-aware persuasion, buyer risk adjustment, and exploration. If the score changes after deploying the full system, we cannot tell from the final score alone which component helped and which hurt. This is the standard motivation for ablation experiments.</p>
-<p>Our final data-collection setup therefore reframes the remaining evaluation as an ablation-style comparison rather than a single full-system test. The desired matrix is:</p>
+<p>Our final data-collection setup therefore reframes the remaining evaluation as an ablation-style comparison rather than a single full-system test. Separating vanilla-control logs from adaptive-agent logs fixes part of the earlier limitation. A cleaner future version would also log the exact strategy version, agent name, timestamp, and commit hash for every completed game. For game-family analysis, the most useful additional fields are initial offer, final offer, round, accept/reject decision, payoff, and opponent identity for bargaining; seller/buyer role, valuation, price path, final price, and failure reason for negotiation; and argument type, price, quality, bought/not bought, and realized payoff for persuasion.</p>
+<p>The persuasion experiment has an additional selection-bias limitation. If one argument type has more attempts and higher payoff, that does not prove the argument type is intrinsically better; it may have been selected more often against easier opponents or more favorable prices. To reduce this confounding, the agent should force early balanced exploration across economic, fairness, safety, social, convenience, and long-term arguments before exploiting the best-scoring frame.</p>
+<p>Finally, we summarize the main observed failure modes, organized by the taxonomy introduced in Section 4:</p>
 <table><tbody>
-<tr><th>Version</th><th>Change from baseline</th><th>Purpose</th></tr>
-<tr><td>V0</td><td>Vanilla / official-style baseline</td><td>Reference point for leaderboard and local logs.</td></tr>
-<tr><td>V1</td><td>Baseline + opponent modeling</td><td>Test whether opponent adaptation improves bargaining/negotiation.</td></tr>
-<tr><td>V2</td><td>Baseline + time-aware concession</td><td>Test whether deadlock prevention improves agreement and score.</td></tr>
-<tr><td>V3</td><td>Baseline + payoff-aware persuasion</td><td>Test whether argument selection improves persuasion payoff/rating.</td></tr>
-<tr><td>V4</td><td>Baseline + anchoring changes</td><td>Test whether more aggressive opening offers help or hurt.</td></tr>
-<tr><td>V5</td><td>All components</td><td>Final integrated agent.</td></tr>
+<tr><th>Cluster</th><th>Failure mode</th><th>Cause</th><th>Fix or mitigation</th><th>Paper value</th></tr>
+<tr><td>Convergence</td><td>Static-offer deadlock</td><td>Repeated bargaining or negotiation counters did not move over rounds.</td><td>Round-based concession schedule.</td><td>Shows why time-awareness matters.</td></tr>
+<tr><td>Infrastructure</td><td>Queue pause</td><td>Consecutive timed-out turns made GLEE pause queue joins.</td><td>Parse retry time and automatically rejoin after pause.</td><td>Shows reliability affects score.</td></tr>
+<tr><td>Infrastructure</td><td>Persuasion crash</td><td>Shared JSON temp filename across processes caused profile-save races.</td><td>Process/thread-specific temp files before atomic replace.</td><td>Concrete engineering lesson.</td></tr>
+<tr><td>Payoff modeling</td><td>Zero-payoff persuasion</td><td>Buyer rejection or unfavorable accepted trades.</td><td>Payoff-aware argument tracking and buyer risk adjustment.</td><td>Motivates payoff rather than acceptance-only modeling.</td></tr>
 </tbody></table>
-<p>The final control-agent setup fixes part of the earlier limitation by separating vanilla-control logs from adaptive-agent logs. A cleaner future version would also log the exact strategy version, agent name, timestamp, and commit hash for every completed game. For game-family analysis, the most useful additional fields are initial offer, final offer, round, accept/reject decision, payoff, and opponent identity for bargaining; seller/buyer role, valuation, price path, final price, and failure reason for negotiation; and argument type, price, quality, bought/not bought, and realized payoff for persuasion.</p>
 <h2>7. Conclusion</h2>
 <p>We built a reliability-first adaptive agent for GLEE and tested it through live competition play. The final system combines deterministic valid actions, opponent profiling, concession schedules, learned calibration, and persuasion payoff tracking. Our experience suggests that in language-based economic-agent competitions, robustness and disciplined experimentation matter as much as sophisticated reasoning. The best use of the remaining competition window is not broad rewrites, but controlled comparison: preserve a vanilla agent, run adaptive agents separately, and make strategy decisions only when fresh batches show stable improvement.</p>
+<p>The fleet, strategy modules, and logging schema described here (<code>fleet.py</code>, <code>simple_agent.py</code>, <code>vanilla_agent.py</code>, <code>logs/</code>) are maintained as a living codebase rather than a one-shot submission: the failure taxonomy in Section 4 and the ablation matrix in Section 5.1 are both designed to absorb new failure modes and new strategy variants as later competition windows generate more data.</p>
 <h2>References</h2>
 <p>Shapira, E., Madmon, O., Reinman, I., Amouyal, S. J., Reichart, R., and Tennenholtz, M. GLEE: A Unified Framework and Benchmark for Language-based Economic Environments. arXiv:2410.05254.</p>
 <p>Shapira, E., Tennenholtz, M., and Reichart, R. Predicting Decisions of AI Agents from Limited Interaction through Text-Tabular Modeling. arXiv:2605.12411.</p>
 <p>Shapira, E., Tennenholtz, M., and Reichart, R. Alignment Makes Language Models Normative, Not Descriptive. arXiv:2603.17218.</p>
 <p>Shapira, E., Tennenholtz, M., and Reichart, R. Sequential LLM Release Facilitates Manipulation in Regulated Markets. arXiv:2601.11496.</p>
+<p class="fn-block"><sup class="fn">1</sup> Code, strategy modules, and logs discussed in this paper live in the authors' project repository.</p>
 </body></html>

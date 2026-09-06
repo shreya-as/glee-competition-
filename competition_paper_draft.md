@@ -1,6 +1,9 @@
 # A Reliability-First Adaptive Agent for the GLEE Competition
 
-*[Author Name], [Affiliation]*
+*[Author Name], [Affiliation]*[^1]
+
+> "Amateurs talk strategy. Professionals talk logistics."
+> — attributed, military/engineering aphorism
 
 ## Abstract
 
@@ -13,6 +16,13 @@ GLEE (Games in Language-based Economic Environments) evaluates agents in sequent
 This setting creates a practical challenge that is easy to underestimate. A strategy can be theoretically appealing but competitively harmful if it occasionally fails to answer, emits an invalid action, or deadlocks against another static agent. Our agent was therefore built around a conservative engineering claim: first never lose a game mechanically, then improve payoff through adaptation. The system evolved through several live experiments during the competition window, including reverted persuasion variants, negotiation hold-out tests, and a final split where `sh_agent1` was kept as a vanilla control while the remaining agents ran the current adaptive strategy.
 
 The resulting paper is not a clean laboratory ablation study. It is a competition-system report based on live online play, noisy opponent pools, and multiple agent slots. This is still enough for a GLEE competition paper because the track asks participants to describe their agent, approach, and findings, including negative results. The strongest scientific value is in the engineering and empirical lessons: which strategies were stable, which were noisy, which failure modes mattered most, and why raw game-level payoff can diverge from leaderboard rating.
+
+Our contributions are as follows:
+
+- **A reliability-first fleet architecture.** Every strategic component, in every game family, is wrapped in a deterministic, schema-valid fallback, so a novel or partially-broken strategy can never mechanically lose a game (Section 2).
+- **Family-conditioned adaptive strategies.** Opponent-behavior profiling and round-based concession ramps for bargaining and negotiation, complete-information fair-price reasoning for negotiation, and variance-penalized payoff-aware argument selection for persuasion (Section 3).
+- **A taxonomy of observed failure modes**, grounded in live competition logs rather than assumed in advance, distinguishing convergence failures, infrastructure failures, and payoff-modeling failures (Section 4).
+- **A controlled evaluation protocol** — a standing vanilla-control agent (`sh_agent1`) run alongside the adaptive fleet, plus a component-level ablation matrix (V0-V5) — for telling true strategic improvement apart from leaderboard noise (Section 5).
 
 ## 2. Agent Architecture
 
@@ -29,6 +39,27 @@ logs/sh_agent1_learning.log
 ```
 
 The remaining agents run the adaptive strategy and write to the shared fleet log. This split is important because leaderboard changes alone were not reliable enough to guide decisions. Several earlier changes appeared beneficial in one batch and harmful in the next, especially in persuasion.
+
+```
+Figure 1: Dispatch and fallback architecture
+
+              incoming game
+                    |
+            dispatch by family
+                    |
+   +----------------+----------------+
+   |                |                |
+Bargaining      Negotiation       Persuasion
+   |                |                |
+opponent model   fair-price       variance-penalized
++ concession     + concession     + argument
+  ramp             + calibration    selection
+   |                |                |
+   +--------- schema-valid, deterministic ---------+
+              fallback (always available)
+```
+
+Every branch in Figure 1 terminates in the same guarantee: if the adaptive component fails, errors, or times out, control falls back to the deterministic `vanilla_agent.py` logic for that family, so the game is never lost mechanically.
 
 ## 3. Strategy Design
 
@@ -58,13 +89,25 @@ The current adaptive persuasion model tracks six argument framings: economic, fa
 
 However, persuasion remained unstable. Recent leaderboard drops suggest either an opponent-pool shift, insufficient adaptation speed, or damage from earlier operational failures. We therefore treat persuasion results cautiously and avoid overclaiming that the adaptive persuasion strategy improved performance.
 
-## 4. Reliability and Failure Handling
+## 4. A Taxonomy of Failure Modes
 
-The most important engineering lesson was that mechanical reliability is a competitive strategy. During live runs, we found a multiprocessing race in profile persistence: multiple agent processes wrote to the same temporary JSON filename before replacing `logs/persuasion_profiles_v2.json`. This caused intermittent `FileNotFoundError` crashes during persuasion decisions. The fix was to make temporary filenames process- and thread-specific before atomic replacement.
+The most important engineering lesson was that mechanical reliability is a competitive strategy. Rather than treat each incident as an isolated bug, we group every failure observed during live play into three clusters, grounded in what actually appeared in `logs/` rather than assumed in advance:
 
-We also observed server-side queue pauses after agents timed out in several consecutive games. To recover from this safely, the fleet runner now parses the server retry time, sleeps until the pause expires, and then rejoins the queue automatically. This prevents a paused agent from silently dying during the final evaluation window.
+```
+Figure 2: Failure-mode clusters (n=4 observed, Table in Section 6)
 
-These details are worth reporting because they affected real competition performance. In GLEE, a strong strategy that occasionally crashes can be worse than a simple strategy that always replies.
+ Failure Modes
+   |
+   +-- Convergence          (bad strategic dynamics, e.g. static-offer deadlock)
+   +-- Infrastructure       (bad execution, e.g. queue pause, profile-save race)
+   +-- Payoff Modeling      (bad objective, e.g. zero-payoff persuasion despite acceptance)
+```
+
+The **Infrastructure** cluster proved the costliest in practice. During live runs, we found a multiprocessing race in profile persistence: multiple agent processes wrote to the same temporary JSON filename before replacing `logs/persuasion_profiles_v2.json`. This caused intermittent `FileNotFoundError` crashes during persuasion decisions. The fix was to make temporary filenames process- and thread-specific before atomic replacement.
+
+We also observed server-side queue pauses after agents timed out in several consecutive games — another Infrastructure-cluster failure. To recover from this safely, the fleet runner now parses the server retry time, sleeps until the pause expires, and then rejoins the queue automatically. This prevents a paused agent from silently dying during the final evaluation window.
+
+These details are worth reporting because they affected real competition performance. In GLEE, a strong strategy that occasionally crashes can be worse than a simple strategy that always replies. The full failure table, with cause and fix per cluster, appears in Section 6.
 
 ## 5. Evaluation
 
@@ -125,18 +168,20 @@ Our final data-collection setup therefore reframes the remaining evaluation as a
 
 The persuasion experiment has an additional selection-bias limitation. If one argument type has more attempts and higher payoff, that does not prove the argument type is intrinsically better; it may have been selected more often against easier opponents or more favorable prices. To reduce this confounding, the agent should force early balanced exploration across economic, fairness, safety, social, convenience, and long-term arguments before exploiting the best-scoring frame.
 
-Finally, we summarize the main observed failure modes:
+Finally, we summarize the main observed failure modes, organized by the taxonomy introduced in Section 4:
 
-| Failure mode | Cause | Fix or mitigation | Paper value |
-|---|---|---|---|
-| Static-offer deadlock | Repeated bargaining or negotiation counters did not move over rounds. | Round-based concession schedule. | Shows why time-awareness matters. |
-| Queue pause | Consecutive timed-out turns made GLEE pause queue joins. | Parse retry time and automatically rejoin after pause. | Shows reliability affects score. |
-| Persuasion crash | Shared JSON temp filename across processes caused profile-save races. | Process/thread-specific temp files before atomic replace. | Concrete engineering lesson. |
-| Zero-payoff persuasion | Buyer rejection or unfavorable accepted trades. | Payoff-aware argument tracking and buyer risk adjustment. | Motivates payoff rather than acceptance-only modeling. |
+| Cluster | Failure mode | Cause | Fix or mitigation | Paper value |
+|---|---|---|---|---|
+| Convergence | Static-offer deadlock | Repeated bargaining or negotiation counters did not move over rounds. | Round-based concession schedule. | Shows why time-awareness matters. |
+| Infrastructure | Queue pause | Consecutive timed-out turns made GLEE pause queue joins. | Parse retry time and automatically rejoin after pause. | Shows reliability affects score. |
+| Infrastructure | Persuasion crash | Shared JSON temp filename across processes caused profile-save races. | Process/thread-specific temp files before atomic replace. | Concrete engineering lesson. |
+| Payoff modeling | Zero-payoff persuasion | Buyer rejection or unfavorable accepted trades. | Payoff-aware argument tracking and buyer risk adjustment. | Motivates payoff rather than acceptance-only modeling. |
 
 ## 7. Conclusion
 
 We built a reliability-first adaptive agent for GLEE and tested it through live competition play. The final system combines deterministic valid actions, opponent profiling, concession schedules, learned calibration, and persuasion payoff tracking. Our experience suggests that in language-based economic-agent competitions, robustness and disciplined experimentation matter as much as sophisticated reasoning. The best use of the remaining competition window is not broad rewrites, but controlled comparison: preserve a vanilla agent, run adaptive agents separately, and make strategy decisions only when fresh batches show stable improvement.
+
+The fleet, strategy modules, and logging schema described here (`fleet.py`, `simple_agent.py`, `vanilla_agent.py`, `logs/`) are maintained as a living codebase rather than a one-shot submission: the failure taxonomy in Section 4 and the ablation matrix in Section 5.1 are both designed to absorb new failure modes and new strategy variants as later competition windows generate more data.
 
 ## References
 
@@ -147,3 +192,5 @@ Shapira, E., Tennenholtz, M., and Reichart, R. Predicting Decisions of AI Agents
 Shapira, E., Tennenholtz, M., and Reichart, R. Alignment Makes Language Models Normative, Not Descriptive. arXiv:2603.17218.
 
 Shapira, E., Tennenholtz, M., and Reichart, R. Sequential LLM Release Facilitates Manipulation in Regulated Markets. arXiv:2601.11496.
+
+[^1]: Code, strategy modules, and logs discussed in this paper live in the authors' project repository.

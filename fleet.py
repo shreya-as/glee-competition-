@@ -1,14 +1,13 @@
 """Run clean GLEE ablation agents.
 
 Agent/version assignment:
-    1 sh_agent1      -> V0 vanilla control
-    2 shreyaAgent2   -> V5 advanced + payoff-aware persuasion
-    3 Agent_3        -> V2 vanilla + negotiation concession
-    4 shreya_agent_4 -> V6 advanced + opponent-specific persuasion
+    1 sh_agent1      -> V9 leaderboard push
+    2 shreyaAgent2   -> V1 opponent-model
+    3 Agent_3        -> V3 learned-model
+    4 shreya_agent_4 -> V0 vanilla
     5 agent_5        -> V7 advanced + contextual-bandit persuasion
 
-The earlier V1/V3/V4 ablation strategies remain in experiment_agent.py, but
-these three named agents are frozen on the newer advanced versions below.
+V1/V3/V0 ablation strategies live in experiment_agent.py.
 
 GLEE allows up to 5 agents per account. Create extras in your Dashboard
 (each gets its own API key), then list them all in .env:
@@ -47,7 +46,7 @@ logger = logging.getLogger("fleet")
 RULE_AGENT_CONCURRENCY = 8
 
 AGENT_NAMES = {1: "sh_agent1", 2: "shreyaAgent2", 3: "Agent_3", 4: "shreya_agent_4", 5: "agent_5"}
-AGENT_VERSIONS = {1: "v0", 2: "v5", 3: "v2", 4: "v6", 5: "v7"}
+AGENT_VERSIONS = {1: "v9", 2: "v1", 3: "v3", 4: "v0", 5: "v7"}
 VERSION_LABELS = {
     "v0": "vanilla",
     "v1": "opponent-model",
@@ -57,6 +56,8 @@ VERSION_LABELS = {
     "v5": "payoff-aware",
     "v6": "opponent-specific",
     "v7": "contextual-bandit",
+    "v8": "final-bargaining-v5-negotiation-v3-persuasion-v7",
+    "v9": "leaderboard-push",
 }
 _QUEUE_PAUSE_RE = re.compile(r"try again after ([0-9T:\-.]+Z)")
 
@@ -82,7 +83,7 @@ def _client_for(index: int, api_key: str) -> LoggingGleeClient:
         "strategy_version": VERSION_LABELS.get(version, version),
         "log_path": os.path.join(os.path.dirname(__file__), "logs", f"{version}_games.jsonl"),
         "learning_log_path": os.path.join(os.path.dirname(__file__), "logs", f"{version}_learning.log"),
-        "update_opponent_profile": version in {"v1", "v5"},
+        "update_opponent_profile": version in {"v1", "v5", "v8", "v9"},
     }
     if base_url:
         kwargs["base_url"] = base_url

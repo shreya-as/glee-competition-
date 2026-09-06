@@ -1,0 +1,152 @@
+\documentclass{article}
+
+% ============================================================
+% GLEE Competition paper -- NeurIPS 2026 format
+% Track: IAB competition-paper track (OpenReview), single-blind,
+% lightweight review by organizers/PC.
+% Length: <=4 content pages, unlimited pages for references.
+% ============================================================
+
+% --- Package selection -------------------------------------------------
+% Default \usepackage{neurips_2026} anonymizes the author block and adds
+% line numbers (double-blind style). Since this track is SINGLE-blind
+% (reviewers see author identity), the "preprint" option below is used
+% instead so the real author name/affiliation is printed. If the GLEE
+% organizers provide their own track option in neurips_2026.sty, swap
+% the line below for that option instead.
+\usepackage[preprint]{neurips_2026}
+% \usepackage{neurips_2026}              % <- default double-blind style (alternative)
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{amsfonts}
+\usepackage{nicefrac}
+\usepackage{microtype}
+\usepackage{xcolor}
+
+\title{A Reliability-First Adaptive Agent for the GLEE Competition}
+
+\author{%
+  [Author Name]\thanks{Corresponding author. GLEE Agent ID: [insert Agent ID].} \\
+  [Affiliation] \\
+  \texttt{[author email]}
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+We describe an autonomous agent for the GLEE Competition, which evaluates agents in three language-based economic game families: bargaining, negotiation, and persuasion. Our design follows a reliability-first principle: because invalid actions, timeouts, and abandoned games create severe scoring penalties, every strategic component is wrapped in a deterministic, schema-compatible fallback. The submitted fleet spans ten versioned rule-based strategies (V0--V9), combining opponent-behavior profiling, round-based concession schedules, complete-information fair-price reasoning, lightweight learned calibration from logged games, and variance-penalized payoff-aware persuasion. We ran a dedicated vanilla-control agent (V0) alongside the fully adaptive agent (V9, our competition entry) over the same live opponent pool to separate true strategic improvement from leaderboard noise. Head-to-head logs show the adaptive agent resolves bargaining faster at equal payoff, trades negotiation deal frequency for better per-deal terms, and only marginally improves persuasion payoff conditional on success. Our central finding is that the value of adaptation is strongly game-dependent, and that mechanical reliability -- never losing a game to a crash, timeout, or invalid action -- was as decisive for competition score as any strategic component.
+\end{abstract}
+
+\section{Agent Overview and Motivation}
+\label{sec:intro}
+
+GLEE (Games in Language-based Economic Environments) evaluates agents in sequential two-player economic interactions where natural-language communication and structured economic actions both matter. The competition contains three families: bargaining over a fixed surplus, buyer--seller negotiation over an indivisible good, and persuasion under asymmetric information. Agents are ranked by family-level scores reflecting payoff relative to other players in comparable roles and configurations.
+
+This setting creates a practical risk that is easy to underestimate: a strategy can be theoretically appealing but competitively harmful if it occasionally fails to answer, emits an invalid action, or deadlocks against a static opponent. We therefore built our agent around a conservative engineering claim -- \emph{first never lose a game mechanically, then improve payoff through adaptation} -- and evolved it through several live experiments during the competition window, including a reverted persuasion variant, a negotiation deadlock fix, and a final vanilla-vs-adaptive control split.
+
+Our contributions are: (1) a reliability-first fleet architecture in which every strategic component, in every game family, falls back to a deterministic, schema-valid baseline; (2) family-conditioned adaptive strategies -- opponent profiling and concession ramps for bargaining and negotiation, complete-information fair-price reasoning for negotiation, and variance-penalized argument selection for persuasion; (3) a failure-mode taxonomy grounded in live competition logs; and (4) a controlled evaluation comparing a standing vanilla-control agent against the fully adaptive agent under the same live opponent pool.
+
+\section{Technical Approach}
+\label{sec:technical}
+
+We use the official Python GLEE SDK. Each incoming game is dispatched by family to a deterministic strategy function; no component calls an external LLM. The fleet runs five GLEE agent accounts, each pinned to one of ten versioned strategies (Table~\ref{tab:versions}): \texttt{sh\_agent1}$\to$V9, \texttt{shreyaAgent2}$\to$V1, \texttt{Agent\_3}$\to$V3, \texttt{shreya\_agent\_4}$\to$V0, \texttt{agent\_5}$\to$V7. V0 (\texttt{vanilla\_agent.py}) is a simple baseline: it proposes an even split in bargaining and accepts offers worth at least 40\% of the pot, accepts profitable offers and otherwise counters from its own valuation in negotiation, and follows a myopic expected-value rule in persuasion. V9 is the fully adaptive strategy submitted for leaderboard scoring, composing opponent modeling (\texttt{opponent\_model.py}), a learned calibration model (\texttt{learned\_model.py}), and payoff-aware persuasion scoring (\texttt{persuasion\_model\_v2.py}) on top of the V0 fallback.
+
+\begin{table}[t]
+\caption{Strategy versions in the competition fleet. V1--V8 isolate individual components; V9 is the full adaptive strategy submitted as \texttt{sh\_agent1}.}
+\label{tab:versions}
+\centering
+\small
+\begin{tabular}{ll}
+\toprule
+Version & Component added over V0 \\
+\midrule
+V0 & Vanilla baseline (our control, run as \texttt{shreya\_agent\_4}) \\
+V1 & Opponent-behavior modeling \\
+V2 & Round-based concession schedule \\
+V3 & Learned threshold calibration \\
+V4 & Persuasion argument adaptation \\
+V5 & Payoff-aware persuasion scoring \\
+V6 & Opponent-specific tuning \\
+V7 & Contextual-bandit persuasion selection \\
+V8 & Combined bargaining V5 + negotiation V3 + persuasion V7 \\
+V9 & Full stack (opponent model + learned calibration + payoff-aware persuasion) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Every branch terminates in the same guarantee: if an adaptive component errors, returns a malformed action, or times out, control falls back to the deterministic V0 logic for that family, so no game is lost mechanically to a bug. During live runs we found and fixed a multiprocessing race in persuasion-profile persistence (concurrent processes wrote the same temporary JSON filename before an atomic rename into \texttt{persuasion\_profiles\_v2.json}, causing intermittent \texttt{FileNotFoundError}), and we added automatic queue-pause recovery: the fleet runner parses the server's retry timestamp from timeout errors and rejoins the queue automatically instead of silently dying.
+
+\section{Strategic Design Choices}
+\label{sec:strategy}
+
+\textbf{Bargaining.} The baseline (propose 50/50, accept $\geq$40\% of the pot) was already close to a local ceiling for our opponent pool; a more self-favoring anchor did not consistently improve leaderboard score. The adaptive strategy retains two defensible mechanisms: opponent classification (aggressive / cooperative / random / unknown) from concession patterns, which shifts the acceptance threshold accordingly, and a round-based concession ramp to avoid the static-offer deadlocks we observed in early logs.
+
+\textbf{Negotiation.} This was our primary target for explicit economic reasoning. When complete information reveals both players' valuations, the agent computes the fair surplus-splitting price and rejects offers that are merely profitable but assign almost all surplus to the opponent -- the most defensible change, since it uses information the environment directly exposes. A concession schedule replaces the earlier static-counteroffer behavior that produced long, undealt games. A lightweight model trained on logged outcomes predicts agreement probability from final-offer terms and round number; because the logs lack full counterfactual trajectories, this is used only as a calibration signal, not a replacement policy.
+
+\textbf{Persuasion.} The seller can earn very large payoffs when buyers accept, but many games yield zero payoff. We tested calibrated-lying formulas and payoff-aware argument selection; the calibrated-lying variant was reverted after its effect changed sign across successive live batches. The surviving strategy tracks six argument framings (economic, fairness, safety, social, convenience, long-term) and scores each by estimated expected payoff minus a variance penalty, rather than by raw acceptance rate, since high acceptance does not imply high payoff in this family.
+
+\section{Development Process}
+\label{sec:development}
+
+Beyond the rule-based fleet, we prototyped two LLM-backed variants (\texttt{litellm\_agent.py}, \texttt{llm\_agent.py}) and a self-reflective critique loop (\texttt{reflective\_agent.py}). None of the three are wired into the final fleet configuration; we do not have a controlled comparison against the rule-based strategies and leave that to future work rather than claim an outcome we did not measure. Within the rule-based line, the strategy evolved V0 $\to$ V9 by isolating one mechanism per version (Table~\ref{tab:versions}) before combining the survivors into V8 and V9. The persuasion calibrated-lying experiment (\S\ref{sec:strategy}) is our clearest negative result: it looked promising in one batch and harmful in the next, which is why we treat single-batch leaderboard deltas with suspicion and prefer the head-to-head comparison in \S\ref{sec:evaluation}.
+
+\section{Evaluation and Analysis}
+\label{sec:evaluation}
+
+We compare the V0 vanilla control (\texttt{shreya\_agent\_4}) against the V9 full adaptive agent (\texttt{sh\_agent1}) over the same live opponent pool, using each agent's own outcome log. Success is \texttt{outcome == agreement} for bargaining and negotiation, and positive payoff for persuasion (a completed persuasion game can still pay zero).
+
+\begin{table}[t]
+\caption{V0 (vanilla) vs.\ V9 (full adaptive) outcomes, computed directly from \texttt{logs/v0\_games.jsonl} and \texttt{logs/v9\_games.jsonl}. Avg.\ payoff is conditioned on success.}
+\label{tab:v0v9}
+\centering
+\small
+\begin{tabular}{lrrrrrr}
+\toprule
+& \multicolumn{2}{c}{Success rate} & \multicolumn{2}{c}{Avg.\ payoff (success)} & \multicolumn{2}{c}{Avg.\ rounds} \\
+Family & V0 & V9 & V0 & V9 & V0 & V9 \\
+\midrule
+Bargaining  & 87.5\% & 85.1\% & \$157{,}532 & \$161{,}170 & 3.4 & 2.8 \\
+Negotiation & 64.6\% & 30.6\% & \$34{,}177  & \$53{,}646  & 12.5 & 18.5 \\
+Persuasion  & 38.2\% & 31.3\% & \$7{,}778{,}636 & \$8{,}091{,}792 & 20.0 & 20.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Agent Behavior Analysis}
+\label{sec:behavior}
+
+We check each family against the behavior our design intended, rather than assume alignment.
+
+\textbf{Bargaining} behaves as designed: the concession ramp resolves games in fewer rounds (3.4 $\to$ 2.8) at essentially unchanged payoff (+2.3\%) and a small success-rate cost (-2.4 pts), consistent with trading a few marginal deadlocked games for faster resolution rather than for higher payoff.
+
+\textbf{Negotiation} shows the fair-price logic doing exactly what it was built to do -- rejecting profitable-but-unfair offers -- but more aggressively than intended: success rate drops by 34 points (64.6\%$\to$30.6\%) while per-deal payoff rises 57\% and average rounds rise from 12.5 to 18.5. The direction of the effect matches the design goal; the magnitude suggests the fair-price threshold is currently tuned too conservatively for this opponent pool, since a 34-point drop in agreement rate is a larger cost than the strategy was intended to pay. This is a concrete, log-derived instance of unintended behavior, not just a hypothesis.
+
+\textbf{Persuasion} shows the weakest alignment: payoff-aware argument selection was meant to raise expected payoff, and it does (+4.0\% conditional on success), but success rate falls (38.2\%$\to$31.3\%) and both effects are small relative to the family's payoff variance (single-game payoffs range over several orders of magnitude). We do not treat this as evidence the mechanism works; we treat it as inconclusive given the noise, which is why \S\ref{sec:strategy} already frames persuasion results cautiously.
+
+\section{Limitations and Reproducibility}
+\label{sec:limitations}
+
+The V9 agent bundles opponent modeling, learned calibration, and payoff-aware persuasion at once; Table~\ref{tab:v0v9} tells us the bundle's net effect versus vanilla, not which component drove it. Logs already exist for the single-component versions (V1, V3, V4, V5, V7) that would support a finer per-component ablation; we did not complete that analysis here due to space and time constraints, and flag it as the direct next step rather than as a finished result. The live opponent pool is non-stationary, so a rerun over a different window is not guaranteed to reproduce Table~\ref{tab:v0v9} exactly. We also do not have a logged leaderboard-rating snapshot corresponding to this run (only local game logs), so we do not report leaderboard rating numbers here; future runs should snapshot the leaderboard alongside the local logs so rating and local-payoff trends can be compared directly. To reproduce our numbers: run \texttt{fleet.py} with the agent/version mapping in Table~\ref{tab:versions}, and recompute success rate and conditional average payoff per \texttt{game\_family} directly from the corresponding \texttt{logs/v\{N\}\_games.jsonl} file using the success definitions given in \S\ref{sec:evaluation}.
+
+\section*{Acknowledgments}
+No external funding supported this work. The authors declare no competing interests.
+
+\section*{References}
+
+\small
+
+[1] Shapira, E., Madmon, O., Reinman, I., Amouyal, S.\ J., Reichart, R., and Tennenholtz, M. GLEE: A Unified Framework and Benchmark for Language-based Economic Environments. \emph{arXiv:2410.05254}.
+
+[2] Shapira, E., Tennenholtz, M., and Reichart, R. Predicting Decisions of AI Agents from Limited Interaction through Text-Tabular Modeling. \emph{arXiv:2605.12411}.
+
+[3] Shapira, E., Tennenholtz, M., and Reichart, R. Alignment Makes Language Models Normative, Not Descriptive. \emph{arXiv:2603.17218}.
+
+[4] Shapira, E., Tennenholtz, M., and Reichart, R. The Poisoned Apple Effect: Strategic Manipulation of Mediated Markets via Technology Expansion of AI Agents. \emph{arXiv:2601.11496}.
+
+\end{document}

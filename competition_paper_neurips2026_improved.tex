@@ -1,0 +1,162 @@
+\documentclass{article}
+
+\usepackage[preprint]{neurips_2026}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{amsfonts}
+\usepackage{nicefrac}
+\usepackage{microtype}
+\usepackage{xcolor}
+
+\title{Selective Adaptation and Reliability Lessons from a Hybrid GLEE Agent}
+
+\author{%
+  [Author Name]\thanks{Corresponding author. GLEE Agent ID: [insert Agent ID].} \\
+  [Affiliation] \\
+  \texttt{[author email]}
+}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We describe a hybrid agent developed for the GLEE Competition, which evaluates language-based agents in bargaining, negotiation, and persuasion games. Our design goal was not to build a general dialogue model, but to build an economically interpretable agent that combines deterministic rules with selective adaptation where logged evidence justified it. The final agent uses opponent-history features, deadline-aware concession schedules, a small learned threshold model trained from completed-game logs, and stochastic payoff-aware persuasion exploration. The analysis below uses the V0 and V9 outcome logs directly, with broader checks against the per-version and aggregate logs under \texttt{logs/}. These logs show that adaptation helped in some narrow ways but also created clear failure modes. Relative to the vanilla control, the final V9 agent resolved bargaining games faster at similar payoff, but its value-protecting negotiation policy raised payoff per agreement while sharply reducing agreement rate. Persuasion remained noisy: argument selection changed conditional payoff only modestly and did not improve success rate. The main lesson is that GLEE rewards careful engineering and behavioral analysis at least as much as adding strategic complexity; in our logs, the highest-priority future work is to repair stale-turn and bargaining-schema errors, tune negotiation thresholds by role and information setting, report random seeds or disable randomness, and collect complete trajectory and leaderboard snapshots.
+\end{abstract}
+
+\section{Agent Overview and Motivation}
+
+GLEE contains three language-based economic game families: bargaining over a divisible surplus, buyer--seller negotiation over a product, and repeated persuasion under asymmetric information. We aimed to develop a practical competition agent that makes economically interpretable decisions without depending on external LLM calls during play. This choice was motivated by three constraints observed during development: the server expects strict action schemas, games can run concurrently, and payoff distributions vary by several orders of magnitude. A rare invalid action or timeout can erase the value of a sophisticated strategic rule.
+
+The agent therefore follows a conservative principle: use deterministic economic rules as the base policy, add adaptation only when it has a clear interpretation, and analyze whether each adaptive component actually produced the intended behavior. The submitted fleet used five agent accounts with versioned strategies. Only V1--V4 should be read as isolated ablations over V0. V5--V9 are bundled development strategies, and V0 versus V9 is a comparison of two complete policies rather than a component ablation.
+
+\begin{table}[t]
+\caption{Version meanings used in this paper. V1--V4 are the isolated ablations. V5 is overloaded in the codebase: \texttt{experiment\_agent.py} defines a legacy V5 that delegates to \texttt{simple\_agent.py}, while the fleet resolves V5 through \texttt{advanced\_agent.py}; reported V5 logs correspond to the fleet/advanced definition.}
+\label{tab:versions}
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+Version & Status & Main behavior \\
+\midrule
+V0 & Control & Vanilla deterministic baseline \\
+V1 & Isolated ablation & Opponent modeling in bargaining/negotiation \\
+V2 & Isolated ablation & Negotiation concession schedule \\
+V3 & Isolated ablation & Negotiation learned-threshold calibration \\
+V4 & Isolated ablation & Persuasion model v2 only \\
+V5 & Bundled & Advanced payoff-aware persuasion with adaptive bargaining/negotiation \\
+V6 & Bundled & V5 plus opponent-specific persuasion exploitation \\
+V7 & Bundled & V5 plus contextual-bandit persuasion \\
+V8 & Bundled & Hybrid of selected bargaining, negotiation, and persuasion policies \\
+V9 & Bundled final & Deadline-aware bargaining, value-protecting negotiation, exploit-heavy persuasion \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\caption{Recommended isolated ablation set for negotiation analysis. V1--V4 were run live against a changing opponent pool, so these are diagnostic comparisons rather than randomized causal estimates. None of the isolated V1--V4 changes reproduces the large V9 negotiation success collapse reported separately in Table~\ref{tab:v0v9}.}
+\label{tab:ablations}
+\centering
+\small
+\begin{tabular}{llrrrr}
+\toprule
+Version & Change from V0 & N & Success & Avg. payoff & Rounds \\
+\midrule
+V0 & Vanilla control & 1087 & 64.6\% & \$22{,}072 & 12.5 \\
+V1 & Opponent model & 874 & 60.0\% & \$28{,}152 & 12.2 \\
+V2 & Concession schedule & 2235 & 66.6\% & \$25{,}339 & 11.0 \\
+V3 & Learned threshold & 910 & 67.8\% & \$25{,}347 & 9.7 \\
+V4 & Persuasion-only change & 449 & 67.0\% & \$28{,}263 & 11.5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Technical Approach}
+
+The implementation uses the official Python GLEE SDK and dispatches each game to a family-specific policy. The final V9 policy is implemented in \texttt{advanced\_agent.py}; the vanilla baseline is in \texttt{vanilla\_agent.py}; the isolated V1--V4 ablation strategies are in \texttt{experiment\_agent.py}. The fleet runner maps accounts to versions and logs one JSONL row per game that ended on our move. The system is not fully deterministic: V7--V9 persuasion uses random exploration and probabilistic low-quality endorsement decisions, and the current logs do not record random seeds.
+
+\paragraph{Bargaining.}
+V0 proposes an even split and accepts any offer worth at least 40\% of the available pool. V9 keeps the same basic shape but adds opponent classification, patience adjustment from discount factors when visible, and deadline-aware concessions. It opens slightly in its own favor, lowers its acceptance threshold as the deadline approaches, and is more willing to settle against aggressive opponents.
+
+\paragraph{Negotiation.}
+V0 accepts any profitable offer and otherwise counters from a fixed fraction of its private valuation. V9 protects surplus share. When both valuations are visible, it estimates the total surplus and accepts only if its own share clears a decreasing threshold. When the opponent valuation is hidden, it blends a hand-written margin threshold with a learned threshold from \texttt{learned\_model.py}. The learned model is a small logistic regression trained offline by \texttt{train\_model.py} on final logged decision points, using offer margin/share and round number. It is deliberately used as a calibration signal rather than a full policy, because the logs do not contain complete counterfactual trajectories.
+
+\paragraph{Persuasion.}
+The persuasion module tracks six argument frames: economic, fairness, safety, social, convenience, and long-term. The V9 seller uses opponent-specific and global profiles when available, with a contextual bonus based on price, prior probability, and expected buyer value. Arguments are scored by estimated payoff and a variance penalty, not just acceptance rate. V9 usually declines to recommend known low-quality products, but it can still endorse low quality stochastically near the end of a game when the price is high or the prior is favorable. The buyer-side policy remains a myopic expected-value rule with additional caution around low-quality recommendations.
+
+\section{Strategic Design Choices}
+
+The strategic design is intentionally asymmetric across families. Bargaining has a strong simple baseline, so we used small threshold shifts and deadline progress rather than aggressive anchoring. Negotiation was the main target for explicit economic reasoning because complete-information games expose enough structure to compute a surplus split. Persuasion was treated as a high-variance bandit problem: the agent explores argument types early, then exploits opponent-specific or global profiles while avoiding repeated failed framings. Because this exploration is stochastic and unseeded in the logged runs, exact persuasion behavior is not bit-reproducible from the current artifacts.
+
+The central tradeoff is visible in negotiation. Accepting every profitable offer maximizes agreement frequency but can give nearly all surplus to the opponent. Requiring a fairer surplus split can increase payoff conditional on agreement but may lower total expected payoff if too many deals fail. This is exactly the tradeoff our logs expose, and it became the main area for improvement.
+
+\section{Development Process}
+
+Development proceeded by live ablations rather than by a single final rewrite. The vanilla policy gave a stable reference point. Opponent modeling, concession schedules, learned threshold calibration, and persuasion model v2 were introduced separately in V1--V4. Later versions are bundled engineering strategies, not isolated ablations. We also prototyped LLM-backed agents and a reflective critique loop, but they are not part of the final fleet and are not claimed as evaluated results.
+
+Several negative results changed the final design. A calibrated persuasion variant changed sign across live batches, so we reverted it. A persuasion profile persistence bug produced intermittent \texttt{FileNotFoundError} traces when multiple processes wrote the same temporary JSON file; the V2 profile writer now includes process and thread identifiers in the temporary filename before atomic replacement. The run logs also show many stale-turn server rejections such as ``It is not your turn'' and bargaining offer-schema rejections. These were handled by the SDK retry loop often enough for games to continue, but they are genuine reliability problems and should not be described as solved.
+
+\section{Evaluation and Analysis}
+
+All numbers in this section are computed from files under \texttt{logs/}. We report them as local behavioral evidence, not as official leaderboard ratings. The logger has an important coverage limitation: \texttt{game\_logger.py} records games that end on our move, so games accepted by the opponent after one of our offers may be missing. The live opponent pool also changed over time, so version comparisons are suggestive rather than randomized controlled trials.
+
+\begin{table}[t]
+\caption{Vanilla V0 and final V9 outcomes from \texttt{logs/v0\_games.jsonl} and \texttt{logs/v9\_games.jsonl}. Success means agreement for bargaining/negotiation and positive payoff for persuasion. ``Avg. payoff'' is over all logged rows; ``payoff on success'' is conditional on success.}
+\label{tab:v0v9}
+\centering
+\small
+\begin{tabular}{llrrrrr}
+\toprule
+Family & Version & N & Success & Avg. payoff & Payoff on success & Rounds \\
+\midrule
+Bargaining  & V0 & 786  & 87.5\% & \$137{,}890 & \$157{,}532 & 3.4 \\
+Bargaining  & V9 & 1304 & 85.1\% & \$137{,}193 & \$161{,}170 & 2.8 \\
+Negotiation & V0 & 1087 & 64.6\% & \$22{,}072  & \$34{,}177  & 12.5 \\
+Negotiation & V9 & 857  & 30.6\% & \$16{,}401  & \$53{,}646  & 18.5 \\
+Persuasion  & V0 & 899  & 38.2\% & \$2{,}925{,}928 & \$7{,}778{,}636 & 20.0 \\
+Persuasion  & V9 & 1105 & 31.3\% & \$2{,}518{,}253 & \$8{,}091{,}792 & 20.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Agent Behavior Analysis}
+
+\paragraph{Bargaining alignment.}
+Bargaining mostly aligns with the design. V9 reduces average logged rounds from 3.4 to 2.8 while maintaining nearly the same unconditional average payoff. This supports the intended role of the concession schedule: close games sooner without attempting a large payoff shift. The remaining concern is role asymmetry. In V9, logged player-1 bargaining success is 76.1\%, while player-2 success is 89.1\%. This suggests the proposal-side policy is still more fragile than the response-side policy.
+
+\paragraph{Negotiation alignment.}
+Negotiation aligns directionally but overshoots. V9 was designed to reject profitable-but-one-sided offers, and the logs show exactly that: payoff on successful negotiation rises from \$34,177 to \$53,646. However, success rate falls from 64.6\% to 30.6\%, and unconditional average payoff falls from \$22,072 to \$16,401. Table~\ref{tab:ablations} helps localize the regression: V1--V4 do not show a comparable success collapse, while V9 bundles stricter surplus-share thresholds, deadline logic, opponent conditioning, and learned calibration. The most likely cause is therefore the V9 value-protection bundle rather than opponent modeling or learned calibration alone. The role split is sharper: V9 seller success is only 19.5\%, compared with 36.6\% for the buyer role. Complete-information V9 games close much more often than hidden-information games, but hidden-information games dominate the sample. The practical conclusion is that V9's value-protecting threshold is too conservative, especially as seller and when the opponent valuation is hidden.
+
+\paragraph{Persuasion alignment.}
+Persuasion is inconclusive. V9 modestly increases payoff conditional on positive-payoff games, from \$7.78M to \$8.09M, but lowers success rate and unconditional average payoff. The profile file \texttt{persuasion\_profiles\_v2.json} shows that social and economic framings had the best aggregate observed rates and average payoff per attempt among tracked arguments, but this profile aggregates many opponents and prices. We therefore treat the argument scorer as plausible but not validated.
+
+\paragraph{Reliability alignment.}
+The intended reliability story only partially holds. The JSONL outcome logs are usable and large, but run logs contain repeated stale-turn rejections and bargaining-schema rejections. Those errors likely come from high concurrency, stale game states, and a mismatch between bargaining key conventions in some branches. This matters for the paper: the correct claim is not ``the agent never emits invalid actions,'' but ``the development process identified reliability as a first-order objective, and the logs reveal concrete remaining reliability failures.''
+
+\section{Limitations and Reproducibility}
+
+The main limitation is logging coverage. Because only games ending on our move are recorded, the results may undercount cases where opponents accepted our offers. The second limitation is non-stationarity: versions were run over overlapping but not identical time windows against a changing opponent pool. The third limitation is attribution: V9 bundles several mechanisms, so Table~\ref{tab:v0v9} measures the combined policy rather than a clean causal effect of each component.
+
+To reproduce the reported local analysis, run the fleet mapping in \texttt{fleet.py}, then aggregate each \texttt{logs/v*\_games.jsonl} file by \texttt{game\_family}. For bargaining and negotiation, count \texttt{outcome == agreement} as success. For persuasion, count positive payoff as success. Recompute unconditional payoff, conditional payoff on success, and average logged round. For the learned models, rerun \texttt{python train\_model.py}; the current saved models report 7,992 bargaining training rows and 5,969 negotiation training rows. Exact reruns of V7--V9 persuasion are not reproducible from the current logs because the stochastic choices were not seeded or logged; a reproducible release should set and report seeds or record each random branch.
+
+\section{Practical Lessons for GLEE Agent Design}
+
+Our main lesson for GLEE and the IAB workshop is that economic-agent alignment should be evaluated behaviorally, not only by intent. V9's negotiation policy followed its intended value-protection rule, but the resulting agreement loss reduced unconditional payoff. Its persuasion policy optimized payoff-aware argument scores, but stochastic exploration and occasional low-quality endorsement make the behavior less reproducible and raise an alignment concern that should be logged explicitly. Future GLEE agents should record complete trajectories, random seeds, final leaderboard snapshots, and per-error reliability counts so that strategic gains can be separated from SDK, concurrency, and logging artifacts.
+
+\section*{Acknowledgments}
+No external funding supported this work. The authors declare no competing interests.
+
+\section*{References}
+\small
+
+[1] Shapira, E., Madmon, O., Reinman, I., Amouyal, S. J., Reichart, R., and Tennenholtz, M. GLEE: A Unified Framework and Benchmark for Language-based Economic Environments. \emph{arXiv:2410.05254}.
+
+[2] Shapira, E., Tennenholtz, M., and Reichart, R. Predicting Decisions of AI Agents from Limited Interaction through Text-Tabular Modeling. \emph{arXiv:2605.12411}.
+
+[3] Shapira, E., Tennenholtz, M., and Reichart, R. Alignment Makes Language Models Normative, Not Descriptive. \emph{arXiv:2603.17218}.
+
+[4] Shapira, E., Tennenholtz, M., and Reichart, R. The Poisoned Apple Effect: Strategic Manipulation of Mediated Markets via Technology Expansion of AI Agents. \emph{arXiv:2601.11496}.
+
+\end{document}
