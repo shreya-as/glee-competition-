@@ -1,0 +1,1353 @@
+{
+  "sources": {
+    "final_logs/final_v0_shreya_agent_4_history_with_replays.json": {
+      "sha256": "881d5d639231aa3400ca8cfdaf42bb50211eb8c9ed7c5f8f378501634678e679",
+      "bytes": 42098638
+    },
+    "final_logs/final_v9_sh_agent1_all_games_with_replays.json": {
+      "sha256": "e3e1e81d484ac6f691b13cc5feb131f26945c099829daaf31f4042de40c64d71",
+      "bytes": 103672990
+    },
+    "logs/v0_games.jsonl": {
+      "sha256": "3167586aac36be87bc117aa14e75911e655686e55221430b5b98cefe29fa5d9f",
+      "bytes": 1828896
+    },
+    "logs/v1_games.jsonl": {
+      "sha256": "1be7c2f545948e98871cacdad84cf996568df24f8b8b4600b208c9ed136bec4b",
+      "bytes": 1507606
+    },
+    "logs/v2_games.jsonl": {
+      "sha256": "9269a2a8b67fdf243432027eb25a8e74972c446047989e8b9eec675f8f6d9f6a",
+      "bytes": 3829865
+    },
+    "logs/v3_games.jsonl": {
+      "sha256": "eefa529e4fe819f07f52faf48463441a8bf9771cbd6829df9a77d729c0e07c3f",
+      "bytes": 1501237
+    },
+    "logs/v4_games.jsonl": {
+      "sha256": "d90966b077081a15cb105fd578683fa3972f5d1f917906c6eb3963bb7680a485",
+      "bytes": 765549
+    },
+    "logs/v5_games.jsonl": {
+      "sha256": "1328d3dff2eea9c5e6fbcd60bf4c6c66972895e842dbd32d12c85018e77b54d3",
+      "bytes": 3150900
+    },
+    "logs/v6_games.jsonl": {
+      "sha256": "fa7c1f5ef464f87760c837656048997daee0d1f59e99dd76c2f6f54208c8217c",
+      "bytes": 3119093
+    },
+    "logs/v7_games.jsonl": {
+      "sha256": "ea31e6cebd8eb7e533f283bbf8fc03071f18b8fe0392f0f399ebbad408f3cbc5",
+      "bytes": 3735044
+    },
+    "logs/v8_games.jsonl": {
+      "sha256": "aab324a60e38503d89870b516c531a7947e0c1729c22ac40f463992de770fcb3",
+      "bytes": 2408470
+    },
+    "logs/v9_games.jsonl": {
+      "sha256": "8a0a64c3fc38d9868929d83bdcd0eebac6af35656c0da3036408affabd8b8202",
+      "bytes": 2263048
+    },
+    "logs/learned_bargaining.json": {
+      "sha256": "2c0ce2f0554bf9e82db43497a65d0083c1744e5dfc28ca1fe3ea962de69f287d",
+      "bytes": 459
+    },
+    "logs/learned_negotiation.json": {
+      "sha256": "a42d9d544830d73cd8e5cb93898a54bf005f5d21956f99b32cf2ebff959701d2",
+      "bytes": 459
+    }
+  },
+  "integrity": {
+    "v0": {
+      "rows": 3265,
+      "player_ids": [
+        "3fb24c7b-70cd-4fc0-ad9e-8b90792da3be"
+      ],
+      "start_min_utc": "2026-08-29T12:26:58.465813+00:00",
+      "start_max_utc": "2026-08-29T18:49:40.025050+00:00"
+    },
+    "v9": {
+      "rows": 7787,
+      "player_ids": [
+        "e86a468d-a890-4f57-a7b1-0afbab49dcf4"
+      ],
+      "start_min_utc": "2026-08-29T06:27:21.177289+00:00",
+      "start_max_utc": "2026-08-29T18:48:53.297024+00:00"
+    }
+  },
+  "shared_start_window_utc": [
+    "2026-08-29T12:26:58.465813+00:00",
+    "2026-08-29T18:48:53.297024+00:00"
+  ],
+  "full_exports": {
+    "v0": {
+      "api_games": 3265,
+      "local_rows": 1103,
+      "local_unique": 1103,
+      "duplicate_local_rows": 0,
+      "in_both": 1103,
+      "api_only": 2162,
+      "local_only": 0,
+      "missing_local_terminal_result": 43,
+      "terminal_disagreement_ids": [],
+      "families": {
+        "bargaining": {
+          "all": {
+            "n": 1079,
+            "successes": 996,
+            "success_pct": 92.3076923076923,
+            "mean_payoff": 144386.6373772011,
+            "mean_payoff_success": 156418.85715863455,
+            "outcomes": {
+              "agreement": 996,
+              "invalid_moves_exceeded": 1,
+              "no_deal": 73,
+              "timeout": 4,
+              "walked_away": 5
+            }
+          },
+          "matched": {
+            "n": 297,
+            "successes": 251,
+            "success_pct": 84.51178451178451,
+            "mean_payoff": 137470.19488215487,
+            "mean_payoff_success": 162663.93577689244,
+            "outcomes": {
+              "agreement": 251,
+              "no_deal": 46
+            }
+          },
+          "api_only": {
+            "n": 782,
+            "successes": 745,
+            "success_pct": 95.2685421994885,
+            "mean_payoff": 147013.47039641943,
+            "mean_payoff_success": 154314.81053691276,
+            "outcomes": {
+              "agreement": 745,
+              "invalid_moves_exceeded": 1,
+              "no_deal": 27,
+              "timeout": 4,
+              "walked_away": 5
+            }
+          },
+          "acceptance_actors": {
+            "matched_self": 251,
+            "missing_opponent": 591,
+            "missing_self": 154
+          }
+        },
+        "negotiation": {
+          "all": {
+            "n": 1069,
+            "successes": 499,
+            "success_pct": 46.67913938260056,
+            "mean_payoff": 24610.13383536015,
+            "mean_payoff_success": 52721.90995991984,
+            "outcomes": {
+              "agreement": 499,
+              "no_deal": 510,
+              "timeout": 9,
+              "walked_away": 51
+            }
+          },
+          "matched": {
+            "n": 428,
+            "successes": 271,
+            "success_pct": 63.3177570093458,
+            "mean_payoff": 21128.510841121497,
+            "mean_payoff_success": 33369.01343173432,
+            "outcomes": {
+              "agreement": 271,
+              "no_deal": 157
+            }
+          },
+          "api_only": {
+            "n": 641,
+            "successes": 228,
+            "success_pct": 35.569422776911075,
+            "mean_payoff": 26934.83686427457,
+            "mean_payoff_success": 75724.69486842105,
+            "outcomes": {
+              "agreement": 228,
+              "no_deal": 353,
+              "timeout": 9,
+              "walked_away": 51
+            }
+          },
+          "acceptance_actors": {
+            "matched_self": 271,
+            "missing_opponent": 90,
+            "missing_self": 138
+          }
+        },
+        "persuasion": {
+          "all": {
+            "n": 1117,
+            "successes": 603,
+            "success_pct": 53.98388540734109,
+            "mean_payoff": 2927553.3572068037,
+            "mean_payoff_success": 5484691.376451078,
+            "outcomes": {
+              "completed": 1106,
+              "timeout": 11
+            }
+          },
+          "matched": {
+            "n": 378,
+            "successes": 156,
+            "success_pct": 41.26984126984127,
+            "mean_payoff": 3361848.412698413,
+            "mean_payoff_success": 8332823.717948718,
+            "outcomes": {
+              "completed": 378
+            }
+          },
+          "api_only": {
+            "n": 739,
+            "successes": 447,
+            "success_pct": 60.487144790257105,
+            "mean_payoff": 2705410.554803789,
+            "mean_payoff_success": 4490712.304250559,
+            "outcomes": {
+              "completed": 728,
+              "timeout": 11
+            }
+          },
+          "acceptance_actors": {}
+        }
+      }
+    },
+    "v9": {
+      "api_games": 7787,
+      "local_rows": 3266,
+      "local_unique": 3003,
+      "duplicate_local_rows": 263,
+      "in_both": 3000,
+      "api_only": 4787,
+      "local_only": 3,
+      "missing_local_terminal_result": 101,
+      "terminal_disagreement_ids": [],
+      "families": {
+        "bargaining": {
+          "all": {
+            "n": 2616,
+            "successes": 2520,
+            "success_pct": 96.3302752293578,
+            "mean_payoff": 155671.69422782876,
+            "mean_payoff_success": 161602.044484127,
+            "outcomes": {
+              "agreement": 2520,
+              "no_deal": 90,
+              "timeout": 1,
+              "walked_away": 5
+            }
+          },
+          "matched": {
+            "n": 1208,
+            "successes": 1143,
+            "success_pct": 94.61920529801324,
+            "mean_payoff": 151942.81351821191,
+            "mean_payoff_success": 160583.4809536308,
+            "outcomes": {
+              "agreement": 1143,
+              "no_deal": 65
+            }
+          },
+          "api_only": {
+            "n": 1408,
+            "successes": 1377,
+            "success_pct": 97.79829545454545,
+            "mean_payoff": 158870.90438210228,
+            "mean_payoff_success": 162447.51878721858,
+            "outcomes": {
+              "agreement": 1377,
+              "no_deal": 25,
+              "timeout": 1,
+              "walked_away": 5
+            }
+          },
+          "acceptance_actors": {
+            "matched_self": 1143,
+            "missing_opponent": 1108,
+            "missing_self": 269
+          }
+        },
+        "negotiation": {
+          "all": {
+            "n": 2665,
+            "successes": 1357,
+            "success_pct": 50.91932457786116,
+            "mean_payoff": 27485.15359099437,
+            "mean_payoff_success": 53977.844008843036,
+            "outcomes": {
+              "agreement": 1357,
+              "invalid_moves_exceeded": 7,
+              "no_deal": 1146,
+              "timeout": 5,
+              "walked_away": 150
+            }
+          },
+          "matched": {
+            "n": 780,
+            "successes": 284,
+            "success_pct": 36.41025641025641,
+            "mean_payoff": 18524.687153846153,
+            "mean_payoff_success": 50877.66190140845,
+            "outcomes": {
+              "agreement": 284,
+              "no_deal": 496
+            }
+          },
+          "api_only": {
+            "n": 1885,
+            "successes": 1073,
+            "success_pct": 56.92307692307692,
+            "mean_payoff": 31192.932806366047,
+            "mean_payoff_success": 54798.39547064306,
+            "outcomes": {
+              "agreement": 1073,
+              "invalid_moves_exceeded": 7,
+              "no_deal": 650,
+              "timeout": 5,
+              "walked_away": 150
+            }
+          },
+          "acceptance_actors": {
+            "matched_self": 284,
+            "missing_opponent": 865,
+            "missing_self": 208
+          }
+        },
+        "persuasion": {
+          "all": {
+            "n": 2506,
+            "successes": 1312,
+            "success_pct": 52.354349561053475,
+            "mean_payoff": 3096956.9832402235,
+            "mean_payoff_success": 5929195.731707317,
+            "outcomes": {
+              "completed": 2490,
+              "timeout": 16
+            }
+          },
+          "matched": {
+            "n": 1012,
+            "successes": 352,
+            "success_pct": 34.78260869565217,
+            "mean_payoff": 2778807.411067194,
+            "mean_payoff_success": 8037624.1477272725,
+            "outcomes": {
+              "completed": 1012
+            }
+          },
+          "api_only": {
+            "n": 1494,
+            "successes": 960,
+            "success_pct": 64.2570281124498,
+            "mean_payoff": 3312463.922356091,
+            "mean_payoff_success": 5156105.3125,
+            "outcomes": {
+              "completed": 1478,
+              "timeout": 16
+            }
+          },
+          "acceptance_actors": {}
+        }
+      }
+    }
+  },
+  "shared_window": {
+    "v0": {
+      "api_games": 3259,
+      "local_rows": 1102,
+      "local_unique": 1102,
+      "duplicate_local_rows": 0,
+      "in_both": 1102,
+      "api_only": 2157,
+      "local_only": 0,
+      "missing_local_terminal_result": 43,
+      "terminal_disagreement_ids": [],
+      "families": {
+        "bargaining": {
+          "all": {
+            "n": 1077,
+            "successes": 994,
+            "success_pct": 92.29340761374188,
+            "mean_payoff": 144185.86975858867,
+            "mean_payoff_success": 156225.53493963782,
+            "outcomes": {
+              "agreement": 994,
+              "invalid_moves_exceeded": 1,
+              "no_deal": 73,
+              "timeout": 4,
+              "walked_away": 5
+            }
+          },
+          "matched": {
+            "n": 297,
+            "successes": 251,
+            "success_pct": 84.51178451178451,
+            "mean_payoff": 137470.19488215487,
+            "mean_payoff_success": 162663.93577689244,
+            "outcomes": {
+              "agreement": 251,
+              "no_deal": 46
+            }
+          },
+          "api_only": {
+            "n": 780,
+            "successes": 743,
+            "success_pct": 95.25641025641026,
+            "mean_payoff": 146742.9921153846,
+            "mean_payoff_success": 154050.5166218035,
+            "outcomes": {
+              "agreement": 743,
+              "invalid_moves_exceeded": 1,
+              "no_deal": 27,
+              "timeout": 4,
+              "walked_away": 5
+            }
+          },
+          "acceptance_actors": {
+            "matched_self": 251,
+            "missing_opponent": 589,
+            "missing_self": 154
+          }
+        },
+        "negotiation": {
+          "all": {
+            "n": 1067,
+            "successes": 497,
+            "success_pct": 46.57919400187441,
+            "mean_payoff": 24633.759953139644,
+            "mean_payoff_success": 52885.75828973843,
+            "outcomes": {
+              "agreement": 497,
+              "no_deal": 510,
+              "timeout": 9,
+              "walked_away": 51
+            }
+          },
+          "matched": {
+            "n": 427,
+            "successes": 270,
+            "success_pct": 63.231850117096016,
+            "mean_payoff": 21121.786042154567,
+            "mean_payoff_success": 33403.71348148148,
+            "outcomes": {
+              "agreement": 270,
+              "no_deal": 157
+            }
+          },
+          "api_only": {
+            "n": 640,
+            "successes": 227,
+            "success_pct": 35.46875,
+            "mean_payoff": 26976.905046875,
+            "mean_payoff_success": 76058.23449339207,
+            "outcomes": {
+              "agreement": 227,
+              "no_deal": 353,
+              "timeout": 9,
+              "walked_away": 51
+            }
+          },
+          "acceptance_actors": {
+            "matched_self": 270,
+            "missing_opponent": 90,
+            "missing_self": 137
+          }
+        },
+        "persuasion": {
+          "all": {
+            "n": 1115,
+            "successes": 601,
+            "success_pct": 53.90134529147982,
+            "mean_payoff": 2927387.533632287,
+            "mean_payoff_success": 5492893.344425957,
+            "outcomes": {
+              "completed": 1106,
+              "timeout": 9
+            }
+          },
+          "matched": {
+            "n": 378,
+            "successes": 156,
+            "success_pct": 41.26984126984127,
+            "mean_payoff": 3361848.412698413,
+            "mean_payoff_success": 8332823.717948718,
+            "outcomes": {
+              "completed": 378
+            }
+          },
+          "api_only": {
+            "n": 737,
+            "successes": 445,
+            "success_pct": 60.379918588873814,
+            "mean_payoff": 2704556.8521031206,
+            "mean_payoff_success": 4497322.247191011,
+            "outcomes": {
+              "completed": 728,
+              "timeout": 9
+            }
+          },
+          "acceptance_actors": {}
+        }
+      }
+    },
+    "v9": {
+      "api_games": 3885,
+      "local_rows": 1654,
+      "local_unique": 1513,
+      "duplicate_local_rows": 141,
+      "in_both": 1513,
+      "api_only": 2372,
+      "local_only": 0,
+      "missing_local_terminal_result": 43,
+      "terminal_disagreement_ids": [],
+      "families": {
+        "bargaining": {
+          "all": {
+            "n": 1293,
+            "successes": 1246,
+            "success_pct": 96.36504253673627,
+            "mean_payoff": 159616.71363495747,
+            "mean_payoff_success": 165637.56880417335,
+            "outcomes": {
+              "agreement": 1246,
+              "no_deal": 42,
+              "walked_away": 5
+            }
+          },
+          "matched": {
+            "n": 619,
+            "successes": 586,
+            "success_pct": 94.66882067851373,
+            "mean_payoff": 158608.05983844912,
+            "mean_payoff_success": 167539.91303754266,
+            "outcomes": {
+              "agreement": 586,
+              "no_deal": 33
+            }
+          },
+          "api_only": {
+            "n": 674,
+            "successes": 660,
+            "success_pct": 97.92284866468843,
+            "mean_payoff": 160543.05888724036,
+            "mean_payoff_success": 163948.51771212122,
+            "outcomes": {
+              "agreement": 660,
+              "no_deal": 9,
+              "walked_away": 5
+            }
+          },
+          "acceptance_actors": {
+            "matched_self": 586,
+            "missing_opponent": 532,
+            "missing_self": 128
+          }
+        },
+        "negotiation": {
+          "all": {
+            "n": 1341,
+            "successes": 688,
+            "success_pct": 51.30499627143922,
+            "mean_payoff": 26870.61869500373,
+            "mean_payoff_success": 52374.27277616279,
+            "outcomes": {
+              "agreement": 688,
+              "invalid_moves_exceeded": 2,
+              "no_deal": 569,
+              "timeout": 3,
+              "walked_away": 79
+            }
+          },
+          "matched": {
+            "n": 383,
+            "successes": 127,
+            "success_pct": 33.15926892950392,
+            "mean_payoff": 19438.569425587466,
+            "mean_payoff_success": 58621.82748031496,
+            "outcomes": {
+              "agreement": 127,
+              "no_deal": 256
+            }
+          },
+          "api_only": {
+            "n": 958,
+            "successes": 561,
+            "success_pct": 58.55949895615866,
+            "mean_payoff": 29841.886826722337,
+            "mean_payoff_success": 50959.94221033868,
+            "outcomes": {
+              "agreement": 561,
+              "invalid_moves_exceeded": 2,
+              "no_deal": 313,
+              "timeout": 3,
+              "walked_away": 79
+            }
+          },
+          "acceptance_actors": {
+            "matched_self": 127,
+            "missing_opponent": 490,
+            "missing_self": 71
+          }
+        },
+        "persuasion": {
+          "all": {
+            "n": 1251,
+            "successes": 662,
+            "success_pct": 52.917665867306155,
+            "mean_payoff": 3111493.76498801,
+            "mean_payoff_success": 5904243.655589124,
+            "outcomes": {
+              "completed": 1240,
+              "timeout": 11
+            }
+          },
+          "matched": {
+            "n": 511,
+            "successes": 188,
+            "success_pct": 36.79060665362035,
+            "mean_payoff": 3053164.1878669276,
+            "mean_payoff_success": 8379029.255319149,
+            "outcomes": {
+              "completed": 511
+            }
+          },
+          "api_only": {
+            "n": 740,
+            "successes": 474,
+            "success_pct": 64.05405405405405,
+            "mean_payoff": 3151772.7027027025,
+            "mean_payoff_success": 4922683.122362869,
+            "outcomes": {
+              "completed": 729,
+              "timeout": 11
+            }
+          },
+          "acceptance_actors": {}
+        }
+      }
+    }
+  },
+  "version_identity": {
+    "official_v9_ids_with_v8_label": 586,
+    "official_v9_ids_with_both_v8_v9_labels": 114,
+    "aligned_v9_ids_with_v8_label": 0,
+    "aligned_v9_ids_with_v9_label": 1513,
+    "aligned_v9_ids_without_local_version_evidence": 2372,
+    "last_v8_local_timestamp": "2026-08-29T17:39:36+0545"
+  },
+  "shared_window_strata": {
+    "v0": {
+      "bargaining|role=player_1|complete_information=False|scale=100": {
+        "n": 93,
+        "successes": 88,
+        "success_pct": 94.6236559139785,
+        "mean_payoff": 43.68086021505376,
+        "mean_payoff_success": 46.162727272727274,
+        "outcomes": {
+          "agreement": 88,
+          "no_deal": 3,
+          "timeout": 1,
+          "walked_away": 1
+        }
+      },
+      "bargaining|role=player_1|complete_information=False|scale=10000": {
+        "n": 83,
+        "successes": 72,
+        "success_pct": 86.74698795180723,
+        "mean_payoff": 3842.1272289156627,
+        "mean_payoff_success": 4429.118888888889,
+        "outcomes": {
+          "agreement": 72,
+          "no_deal": 10,
+          "walked_away": 1
+        }
+      },
+      "bargaining|role=player_1|complete_information=False|scale=1000000": {
+        "n": 100,
+        "successes": 90,
+        "success_pct": 90.0,
+        "mean_payoff": 414660.3829,
+        "mean_payoff_success": 460733.7587777778,
+        "outcomes": {
+          "agreement": 90,
+          "no_deal": 10
+        }
+      },
+      "bargaining|role=player_1|complete_information=True|scale=100": {
+        "n": 90,
+        "successes": 71,
+        "success_pct": 78.88888888888889,
+        "mean_payoff": 34.06055555555555,
+        "mean_payoff_success": 43.17535211267606,
+        "outcomes": {
+          "agreement": 71,
+          "no_deal": 19
+        }
+      },
+      "bargaining|role=player_1|complete_information=True|scale=10000": {
+        "n": 87,
+        "successes": 71,
+        "success_pct": 81.60919540229885,
+        "mean_payoff": 3728.1745977011497,
+        "mean_payoff_success": 4568.32661971831,
+        "outcomes": {
+          "agreement": 71,
+          "no_deal": 15,
+          "walked_away": 1
+        }
+      },
+      "bargaining|role=player_1|complete_information=True|scale=1000000": {
+        "n": 94,
+        "successes": 78,
+        "success_pct": 82.97872340425532,
+        "mean_payoff": 370793.9318085106,
+        "mean_payoff_success": 446854.2255128205,
+        "outcomes": {
+          "agreement": 78,
+          "no_deal": 16
+        }
+      },
+      "bargaining|role=player_2|complete_information=False|scale=100": {
+        "n": 102,
+        "successes": 101,
+        "success_pct": 99.01960784313725,
+        "mean_payoff": 49.440588235294115,
+        "mean_payoff_success": 49.93009900990099,
+        "outcomes": {
+          "agreement": 101,
+          "timeout": 1
+        }
+      },
+      "bargaining|role=player_2|complete_information=False|scale=10000": {
+        "n": 96,
+        "successes": 96,
+        "success_pct": 100.0,
+        "mean_payoff": 4822.9678125,
+        "mean_payoff_success": 4822.9678125,
+        "outcomes": {
+          "agreement": 96
+        }
+      },
+      "bargaining|role=player_2|complete_information=False|scale=1000000": {
+        "n": 85,
+        "successes": 83,
+        "success_pct": 97.6470588235294,
+        "mean_payoff": 482636.6214117647,
+        "mean_payoff_success": 494266.4195180723,
+        "outcomes": {
+          "agreement": 83,
+          "invalid_moves_exceeded": 1,
+          "walked_away": 1
+        }
+      },
+      "bargaining|role=player_2|complete_information=True|scale=100": {
+        "n": 93,
+        "successes": 93,
+        "success_pct": 100.0,
+        "mean_payoff": 49.101612903225806,
+        "mean_payoff_success": 49.101612903225806,
+        "outcomes": {
+          "agreement": 93
+        }
+      },
+      "bargaining|role=player_2|complete_information=True|scale=10000": {
+        "n": 79,
+        "successes": 77,
+        "success_pct": 97.46835443037975,
+        "mean_payoff": 5256.568860759494,
+        "mean_payoff_success": 5393.103116883117,
+        "outcomes": {
+          "agreement": 77,
+          "timeout": 1,
+          "walked_away": 1
+        }
+      },
+      "bargaining|role=player_2|complete_information=True|scale=1000000": {
+        "n": 75,
+        "successes": 74,
+        "success_pct": 98.66666666666667,
+        "mean_payoff": 485401.8969333333,
+        "mean_payoff_success": 491961.382027027,
+        "outcomes": {
+          "agreement": 74,
+          "timeout": 1
+        }
+      },
+      "negotiation|role=buyer|complete_information=False|scale=100": {
+        "n": 128,
+        "successes": 46,
+        "success_pct": 35.9375,
+        "mean_payoff": 5.423828125,
+        "mean_payoff_success": 15.092391304347826,
+        "outcomes": {
+          "agreement": 46,
+          "no_deal": 76,
+          "timeout": 1,
+          "walked_away": 5
+        }
+      },
+      "negotiation|role=buyer|complete_information=False|scale=10000": {
+        "n": 151,
+        "successes": 51,
+        "success_pct": 33.77483443708609,
+        "mean_payoff": 530.861655629139,
+        "mean_payoff_success": 1571.766862745098,
+        "outcomes": {
+          "agreement": 51,
+          "no_deal": 87,
+          "timeout": 3,
+          "walked_away": 10
+        }
+      },
+      "negotiation|role=buyer|complete_information=False|scale=1000000": {
+        "n": 127,
+        "successes": 39,
+        "success_pct": 30.708661417322833,
+        "mean_payoff": 46905.96251968504,
+        "mean_payoff_success": 152745.05743589744,
+        "outcomes": {
+          "agreement": 39,
+          "no_deal": 77,
+          "timeout": 2,
+          "walked_away": 9
+        }
+      },
+      "negotiation|role=buyer|complete_information=True|scale=100": {
+        "n": 63,
+        "successes": 59,
+        "success_pct": 93.65079365079364,
+        "mean_payoff": 14.16031746031746,
+        "mean_payoff_success": 15.120338983050848,
+        "outcomes": {
+          "agreement": 59,
+          "no_deal": 3,
+          "walked_away": 1
+        }
+      },
+      "negotiation|role=buyer|complete_information=True|scale=10000": {
+        "n": 44,
+        "successes": 40,
+        "success_pct": 90.9090909090909,
+        "mean_payoff": 1308.261590909091,
+        "mean_payoff_success": 1439.08775,
+        "outcomes": {
+          "agreement": 40,
+          "no_deal": 4
+        }
+      },
+      "negotiation|role=buyer|complete_information=True|scale=1000000": {
+        "n": 48,
+        "successes": 44,
+        "success_pct": 91.66666666666667,
+        "mean_payoff": 139542.05020833333,
+        "mean_payoff_success": 152227.69113636363,
+        "outcomes": {
+          "agreement": 44,
+          "no_deal": 3,
+          "walked_away": 1
+        }
+      },
+      "negotiation|role=seller|complete_information=False|scale=100": {
+        "n": 120,
+        "successes": 37,
+        "success_pct": 30.833333333333332,
+        "mean_payoff": 6.019166666666667,
+        "mean_payoff_success": 19.521621621621623,
+        "outcomes": {
+          "agreement": 37,
+          "no_deal": 75,
+          "timeout": 1,
+          "walked_away": 7
+        }
+      },
+      "negotiation|role=seller|complete_information=False|scale=10000": {
+        "n": 133,
+        "successes": 48,
+        "success_pct": 36.090225563909776,
+        "mean_payoff": 704.7242105263158,
+        "mean_payoff_success": 1952.6733333333334,
+        "outcomes": {
+          "agreement": 48,
+          "no_deal": 77,
+          "walked_away": 8
+        }
+      },
+      "negotiation|role=seller|complete_information=False|scale=1000000": {
+        "n": 129,
+        "successes": 44,
+        "success_pct": 34.10852713178294,
+        "mean_payoff": 61525.55976744186,
+        "mean_payoff_success": 180381.75477272726,
+        "outcomes": {
+          "agreement": 44,
+          "no_deal": 79,
+          "timeout": 1,
+          "walked_away": 5
+        }
+      },
+      "negotiation|role=seller|complete_information=True|scale=100": {
+        "n": 49,
+        "successes": 35,
+        "success_pct": 71.42857142857143,
+        "mean_payoff": 12.771836734693878,
+        "mean_payoff_success": 17.88057142857143,
+        "outcomes": {
+          "agreement": 35,
+          "no_deal": 10,
+          "timeout": 1,
+          "walked_away": 3
+        }
+      },
+      "negotiation|role=seller|complete_information=True|scale=10000": {
+        "n": 40,
+        "successes": 31,
+        "success_pct": 77.5,
+        "mean_payoff": 1691.06475,
+        "mean_payoff_success": 2182.0190322580647,
+        "outcomes": {
+          "agreement": 31,
+          "no_deal": 9
+        }
+      },
+      "negotiation|role=seller|complete_information=True|scale=1000000": {
+        "n": 35,
+        "successes": 23,
+        "success_pct": 65.71428571428571,
+        "mean_payoff": 154009.14314285715,
+        "mean_payoff_success": 234361.7395652174,
+        "outcomes": {
+          "agreement": 23,
+          "no_deal": 10,
+          "walked_away": 2
+        }
+      },
+      "persuasion|role=buyer|complete_information=NA|scale=100": {
+        "n": 197,
+        "successes": 78,
+        "success_pct": 39.59390862944162,
+        "mean_payoff": 852.2842639593908,
+        "mean_payoff_success": 2175.641025641026,
+        "outcomes": {
+          "completed": 195,
+          "timeout": 2
+        }
+      },
+      "persuasion|role=buyer|complete_information=NA|scale=10000": {
+        "n": 183,
+        "successes": 79,
+        "success_pct": 43.169398907103826,
+        "mean_payoff": 93934.4262295082,
+        "mean_payoff_success": 220000,
+        "outcomes": {
+          "completed": 182,
+          "timeout": 1
+        }
+      },
+      "persuasion|role=buyer|complete_information=NA|scale=1000000": {
+        "n": 199,
+        "successes": 80,
+        "success_pct": 40.20100502512563,
+        "mean_payoff": 8753768.844221106,
+        "mean_payoff_success": 22237500,
+        "outcomes": {
+          "completed": 196,
+          "timeout": 3
+        }
+      },
+      "persuasion|role=seller|complete_information=NA|scale=100": {
+        "n": 171,
+        "successes": 102,
+        "success_pct": 59.64912280701754,
+        "mean_payoff": 755.5555555555555,
+        "mean_payoff_success": 1266.6666666666667,
+        "outcomes": {
+          "completed": 171
+        }
+      },
+      "persuasion|role=seller|complete_information=NA|scale=10000": {
+        "n": 188,
+        "successes": 135,
+        "success_pct": 71.80851063829788,
+        "mean_payoff": 93351.06382978724,
+        "mean_payoff_success": 130000,
+        "outcomes": {
+          "completed": 186,
+          "timeout": 2
+        }
+      },
+      "persuasion|role=seller|complete_information=NA|scale=1000000": {
+        "n": 177,
+        "successes": 127,
+        "success_pct": 71.75141242937853,
+        "mean_payoff": 8401129.943502825,
+        "mean_payoff_success": 11708661.417322835,
+        "outcomes": {
+          "completed": 176,
+          "timeout": 1
+        }
+      }
+    },
+    "v9": {
+      "bargaining|role=player_1|complete_information=False|scale=100": {
+        "n": 108,
+        "successes": 101,
+        "success_pct": 93.51851851851852,
+        "mean_payoff": 42.11074074074074,
+        "mean_payoff_success": 45.02930693069307,
+        "outcomes": {
+          "agreement": 101,
+          "no_deal": 6,
+          "walked_away": 1
+        }
+      },
+      "bargaining|role=player_1|complete_information=False|scale=10000": {
+        "n": 112,
+        "successes": 106,
+        "success_pct": 94.64285714285714,
+        "mean_payoff": 4330.028035714286,
+        "mean_payoff_success": 4575.123962264151,
+        "outcomes": {
+          "agreement": 106,
+          "no_deal": 5,
+          "walked_away": 1
+        }
+      },
+      "bargaining|role=player_1|complete_information=False|scale=1000000": {
+        "n": 106,
+        "successes": 102,
+        "success_pct": 96.22641509433963,
+        "mean_payoff": 449330.9950943396,
+        "mean_payoff_success": 466951.8184313725,
+        "outcomes": {
+          "agreement": 102,
+          "no_deal": 4
+        }
+      },
+      "bargaining|role=player_1|complete_information=True|scale=100": {
+        "n": 106,
+        "successes": 99,
+        "success_pct": 93.39622641509433,
+        "mean_payoff": 41.742547169811324,
+        "mean_payoff_success": 44.69404040404041,
+        "outcomes": {
+          "agreement": 99,
+          "no_deal": 7
+        }
+      },
+      "bargaining|role=player_1|complete_information=True|scale=10000": {
+        "n": 110,
+        "successes": 100,
+        "success_pct": 90.9090909090909,
+        "mean_payoff": 4375.692181818182,
+        "mean_payoff_success": 4813.2614,
+        "outcomes": {
+          "agreement": 100,
+          "no_deal": 10
+        }
+      },
+      "bargaining|role=player_1|complete_information=True|scale=1000000": {
+        "n": 115,
+        "successes": 107,
+        "success_pct": 93.04347826086956,
+        "mean_payoff": 425079.7536521739,
+        "mean_payoff_success": 456861.41747663554,
+        "outcomes": {
+          "agreement": 107,
+          "no_deal": 8
+        }
+      },
+      "bargaining|role=player_2|complete_information=False|scale=100": {
+        "n": 91,
+        "successes": 91,
+        "success_pct": 100.0,
+        "mean_payoff": 46.10989010989011,
+        "mean_payoff_success": 46.10989010989011,
+        "outcomes": {
+          "agreement": 91
+        }
+      },
+      "bargaining|role=player_2|complete_information=False|scale=10000": {
+        "n": 101,
+        "successes": 101,
+        "success_pct": 100.0,
+        "mean_payoff": 4555.082277227722,
+        "mean_payoff_success": 4555.082277227722,
+        "outcomes": {
+          "agreement": 101
+        }
+      },
+      "bargaining|role=player_2|complete_information=False|scale=1000000": {
+        "n": 113,
+        "successes": 111,
+        "success_pct": 98.23008849557522,
+        "mean_payoff": 452456.24831858405,
+        "mean_payoff_success": 460608.61315315316,
+        "outcomes": {
+          "agreement": 111,
+          "walked_away": 2
+        }
+      },
+      "bargaining|role=player_2|complete_information=True|scale=100": {
+        "n": 97,
+        "successes": 96,
+        "success_pct": 98.96907216494846,
+        "mean_payoff": 47.61515463917526,
+        "mean_payoff_success": 48.11114583333333,
+        "outcomes": {
+          "agreement": 96,
+          "no_deal": 1
+        }
+      },
+      "bargaining|role=player_2|complete_information=True|scale=10000": {
+        "n": 114,
+        "successes": 114,
+        "success_pct": 100.0,
+        "mean_payoff": 4846.428245614035,
+        "mean_payoff_success": 4846.428245614035,
+        "outcomes": {
+          "agreement": 114
+        }
+      },
+      "bargaining|role=player_2|complete_information=True|scale=1000000": {
+        "n": 120,
+        "successes": 118,
+        "success_pct": 98.33333333333333,
+        "mean_payoff": 472891.3730833333,
+        "mean_payoff_success": 480906.4811016949,
+        "outcomes": {
+          "agreement": 118,
+          "no_deal": 1,
+          "walked_away": 1
+        }
+      },
+      "negotiation|role=buyer|complete_information=False|scale=100": {
+        "n": 157,
+        "successes": 51,
+        "success_pct": 32.48407643312102,
+        "mean_payoff": 5.8098089171974525,
+        "mean_payoff_success": 17.885098039215688,
+        "outcomes": {
+          "agreement": 51,
+          "invalid_moves_exceeded": 2,
+          "no_deal": 94,
+          "walked_away": 10
+        }
+      },
+      "negotiation|role=buyer|complete_information=False|scale=10000": {
+        "n": 154,
+        "successes": 48,
+        "success_pct": 31.16883116883117,
+        "mean_payoff": 505.6962987012987,
+        "mean_payoff_success": 1622.4422916666667,
+        "outcomes": {
+          "agreement": 48,
+          "no_deal": 98,
+          "walked_away": 8
+        }
+      },
+      "negotiation|role=buyer|complete_information=False|scale=1000000": {
+        "n": 149,
+        "successes": 60,
+        "success_pct": 40.26845637583892,
+        "mean_payoff": 54160.53456375839,
+        "mean_payoff_success": 134498.66083333333,
+        "outcomes": {
+          "agreement": 60,
+          "no_deal": 76,
+          "walked_away": 13
+        }
+      },
+      "negotiation|role=buyer|complete_information=True|scale=100": {
+        "n": 44,
+        "successes": 36,
+        "success_pct": 81.81818181818181,
+        "mean_payoff": 14.4375,
+        "mean_payoff_success": 17.645833333333332,
+        "outcomes": {
+          "agreement": 36,
+          "no_deal": 8
+        }
+      },
+      "negotiation|role=buyer|complete_information=True|scale=10000": {
+        "n": 65,
+        "successes": 58,
+        "success_pct": 89.23076923076923,
+        "mean_payoff": 1666.1129230769232,
+        "mean_payoff_success": 1867.1955172413793,
+        "outcomes": {
+          "agreement": 58,
+          "no_deal": 7
+        }
+      },
+      "negotiation|role=buyer|complete_information=True|scale=1000000": {
+        "n": 70,
+        "successes": 59,
+        "success_pct": 84.28571428571429,
+        "mean_payoff": 138879.4662857143,
+        "mean_payoff_success": 164772.24813559323,
+        "outcomes": {
+          "agreement": 59,
+          "no_deal": 11
+        }
+      },
+      "negotiation|role=seller|complete_information=False|scale=100": {
+        "n": 181,
+        "successes": 82,
+        "success_pct": 45.30386740331492,
+        "mean_payoff": 5.579005524861878,
+        "mean_payoff_success": 12.314634146341463,
+        "outcomes": {
+          "agreement": 82,
+          "no_deal": 86,
+          "walked_away": 13
+        }
+      },
+      "negotiation|role=seller|complete_information=False|scale=10000": {
+        "n": 160,
+        "successes": 57,
+        "success_pct": 35.625,
+        "mean_payoff": 492.8145,
+        "mean_payoff_success": 1383.338947368421,
+        "outcomes": {
+          "agreement": 57,
+          "no_deal": 87,
+          "timeout": 1,
+          "walked_away": 15
+        }
+      },
+      "negotiation|role=seller|complete_information=False|scale=1000000": {
+        "n": 167,
+        "successes": 50,
+        "success_pct": 29.940119760479043,
+        "mean_payoff": 37190.297005988024,
+        "mean_payoff_success": 124215.592,
+        "outcomes": {
+          "agreement": 50,
+          "no_deal": 97,
+          "timeout": 2,
+          "walked_away": 18
+        }
+      },
+      "negotiation|role=seller|complete_information=True|scale=100": {
+        "n": 63,
+        "successes": 61,
+        "success_pct": 96.82539682539682,
+        "mean_payoff": 17.931587301587303,
+        "mean_payoff_success": 18.51950819672131,
+        "outcomes": {
+          "agreement": 61,
+          "walked_away": 2
+        }
+      },
+      "negotiation|role=seller|complete_information=True|scale=10000": {
+        "n": 64,
+        "successes": 63,
+        "success_pct": 98.4375,
+        "mean_payoff": 1851.64203125,
+        "mean_payoff_success": 1881.0331746031745,
+        "outcomes": {
+          "agreement": 63,
+          "no_deal": 1
+        }
+      },
+      "negotiation|role=seller|complete_information=True|scale=1000000": {
+        "n": 67,
+        "successes": 63,
+        "success_pct": 94.02985074626865,
+        "mean_payoff": 173791.35701492536,
+        "mean_payoff_success": 184825.7288888889,
+        "outcomes": {
+          "agreement": 63,
+          "no_deal": 4
+        }
+      },
+      "persuasion|role=buyer|complete_information=NA|scale=100": {
+        "n": 190,
+        "successes": 75,
+        "success_pct": 39.473684210526315,
+        "mean_payoff": 855.2631578947369,
+        "mean_payoff_success": 2174.6666666666665,
+        "outcomes": {
+          "completed": 188,
+          "timeout": 2
+        }
+      },
+      "persuasion|role=buyer|complete_information=NA|scale=10000": {
+        "n": 213,
+        "successes": 79,
+        "success_pct": 37.08920187793427,
+        "mean_payoff": 79436.61971830986,
+        "mean_payoff_success": 215822.78481012658,
+        "outcomes": {
+          "completed": 211,
+          "timeout": 2
+        }
+      },
+      "persuasion|role=buyer|complete_information=NA|scale=1000000": {
+        "n": 212,
+        "successes": 77,
+        "success_pct": 36.320754716981135,
+        "mean_payoff": 8905660.37735849,
+        "mean_payoff_success": 24727272.727272727,
+        "outcomes": {
+          "completed": 212
+        }
+      },
+      "persuasion|role=seller|complete_information=NA|scale=100": {
+        "n": 224,
+        "successes": 153,
+        "success_pct": 68.30357142857143,
+        "mean_payoff": 831.25,
+        "mean_payoff_success": 1216.9934640522877,
+        "outcomes": {
+          "completed": 221,
+          "timeout": 3
+        }
+      },
+      "persuasion|role=seller|complete_information=NA|scale=10000": {
+        "n": 210,
+        "successes": 135,
+        "success_pct": 64.28571428571429,
+        "mean_payoff": 91476.19047619047,
+        "mean_payoff_success": 142296.2962962963,
+        "outcomes": {
+          "completed": 207,
+          "timeout": 3
+        }
+      },
+      "persuasion|role=seller|complete_information=NA|scale=1000000": {
+        "n": 202,
+        "successes": 143,
+        "success_pct": 70.79207920792079,
+        "mean_payoff": 9742574.257425742,
+        "mean_payoff_success": 13762237.762237763,
+        "outcomes": {
+          "completed": 201,
+          "timeout": 1
+        }
+      }
+    }
+  },
+  "saved_training_metrics_not_held_out": {
+    "bargaining": {
+      "accuracy": 0.989,
+      "baseline_accuracy": 0.956,
+      "log_loss": 0.0315,
+      "n": 7992,
+      "positive_rate": 0.956
+    },
+    "negotiation": {
+      "accuracy": 0.839,
+      "baseline_accuracy": 0.519,
+      "log_loss": 0.466,
+      "n": 5969,
+      "positive_rate": 0.519
+    }
+  }
+}

@@ -29,6 +29,7 @@ stats() snapshot is a separate, coarser signal if that's ever needed.
 import json
 import logging
 import os
+import subprocess
 import threading
 import time
 
@@ -41,6 +42,7 @@ import persuasion_model_v2 as persuasion_model
 logger = logging.getLogger("game_logger")
 
 _LOG_PATH = os.path.join(os.path.dirname(__file__), "logs", "games.jsonl")
+_TRAJECTORY_LOG_PATH = os.path.join(os.path.dirname(__file__), "logs", "trajectory.jsonl")
 _LEARNING_LOG_PATH = os.path.join(os.path.dirname(__file__), "logs", "learning.log")
 _write_lock = threading.Lock()
 
@@ -53,6 +55,18 @@ def _write_row(row: dict, path: str = _LOG_PATH) -> None:
         f.write(json.dumps(row, default=str) + "\n")
 
 
+def _commit_hash() -> str | None:
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=os.path.dirname(__file__),
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except Exception:
+        return None
+
+
 def _info_setting(game: dict) -> str:
     opponent = game.get("opponent") or {}
     bits = [f"opponent_disclosed={opponent.get('type') != 'hidden'}"]
@@ -60,6 +74,15 @@ def _info_setting(game: dict) -> str:
     if complete_info is not None:
         bits.append(f"complete_information={complete_info}")
     return ",".join(bits)
+
+
+def _terminal_actor(game: dict, action: dict, result: dict) -> str:
+    """Best-effort terminal attribution from the event visible to this client."""
+    if action.get("decision") in {"accept", "AcceptOffer", "yes", "no"}:
+        return "self"
+    if result.get("outcome") in {"no_deal", "completed"}:
+        return "environment"
+    return "self"
 
 
 def log_outcome(
@@ -70,6 +93,8 @@ def log_outcome(
     agent_name: str | None = None,
     agent_version: str | None = None,
     strategy_version: str | None = None,
+    commit_hash: str | None = None,
+    random_seed: int | str | None = None,
 ) -> None:
     """Call right after move() returns game_over=True for a move we made."""
     game_id = game.get("game_id")
@@ -100,6 +125,9 @@ def log_outcome(
         "pool_size": state.get("money_to_divide"),
         "game_id": game_id,
         "outcome": result.get("outcome"),
+        "ended_by": _terminal_actor(game, action, result),
+        "commit_hash": commit_hash,
+        "random_seed": random_seed,
     }
     if agent_name:
         row["agent_name"] = agent_name
@@ -107,6 +135,95 @@ def log_outcome(
         row["agent_version"] = agent_version
     if strategy_version:
         row["strategy_version"] = strategy_version
+    _write_row(row, path)
+
+
+def _base_event(
+    event_type: str,
+    game: dict | None = None,
+    *,
+    game_id: str | None = None,
+    agent_name: str | None = None,
+    agent_version: str | None = None,
+    strategy_version: str | None = None,
+    commit_hash: str | None = None,
+    random_seed: int | str | None = None,
+) -> dict:
+    game = game or {}
+    state = game.get("game_state") or {}
+    gid = game_id or game.get("game_id")
+    return {
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "event_type": event_type,
+        "game_id": gid,
+        "game_family": game.get("game_family"),
+        "phase": game.get("phase"),
+        "role": game.get("your_player"),
+        "round": state.get("round"),
+        "opponent_id": opponent_model.opponent_key(game) if game else None,
+        "info_setting": _info_setting(game) if game else None,
+        "agent_name": agent_name,
+        "agent_version": agent_version,
+        "strategy_version": strategy_version,
+        "commit_hash": commit_hash,
+        "random_seed": random_seed,
+    }
+
+
+def log_trajectory_event(
+    event_type: str,
+    game: dict | None = None,
+    *,
+    path: str = _TRAJECTORY_LOG_PATH,
+    game_id: str | None = None,
+    action: dict | None = None,
+    response: dict | None = None,
+    error: str | None = None,
+    stats: dict | None = None,
+    agent_name: str | None = None,
+    agent_version: str | None = None,
+    strategy_version: str | None = None,
+    commit_hash: str | None = None,
+    random_seed: int | str | None = None,
+) -> None:
+    """Append one reviewer-facing event row per observed state/action/result."""
+    row = _base_event(
+        event_type,
+        game,
+        game_id=game_id,
+        agent_name=agent_name,
+        agent_version=agent_version,
+        strategy_version=strategy_version,
+        commit_hash=commit_hash,
+        random_seed=random_seed,
+    )
+    if game:
+        state = game.get("game_state") or {}
+        role = game.get("your_player")
+        row.update(
+            {
+                "state": state,
+                "opponent_last_offer": state.get("last_offer"),
+                "my_value": state.get(f"{role}_value") if role else None,
+                "role_type": state.get(f"{role}_role") if role else None,
+                "pool_size": state.get("money_to_divide"),
+            }
+        )
+    if action is not None:
+        row["action"] = action
+    if response is not None:
+        row["response"] = response
+        row["valid"] = response.get("valid")
+        row["game_over"] = response.get("game_over")
+        row["error"] = response.get("error")
+        if response.get("game_over"):
+            result = response.get("result") or {}
+            row["outcome"] = result.get("outcome")
+            row["ended_by"] = _terminal_actor(game or {}, action or {}, result)
+    if error is not None:
+        row["error"] = error
+    if stats is not None:
+        row["stats"] = stats
     _write_row(row, path)
 
 
@@ -166,25 +283,77 @@ class LoggingGleeClient(GleeClient):
         *args,
         log_path: str = _LOG_PATH,
         learning_log_path: str = _LEARNING_LOG_PATH,
+        trajectory_log_path: str = _TRAJECTORY_LOG_PATH,
         agent_name: str | None = None,
         agent_version: str | None = None,
         strategy_version: str | None = None,
+        commit_hash: str | None = None,
+        random_seed: int | str | None = None,
         update_opponent_profile: bool = True,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.log_path = log_path
         self.learning_log_path = learning_log_path
+        self.trajectory_log_path = trajectory_log_path
         self.agent_name = agent_name
         self.agent_version = agent_version
         self.strategy_version = strategy_version or agent_version
+        self.commit_hash = commit_hash or _commit_hash()
+        self.random_seed = random_seed
         self.update_opponent_profile = update_opponent_profile
+
+    def _event_kwargs(self) -> dict:
+        return {
+            "path": self.trajectory_log_path,
+            "agent_name": self.agent_name,
+            "agent_version": self.agent_version,
+            "strategy_version": self.strategy_version,
+            "commit_hash": self.commit_hash,
+            "random_seed": self.random_seed,
+        }
+
+    def log_stats_snapshot(self, label: str) -> None:
+        try:
+            stats = self.stats()
+        except Exception as exc:
+            log_trajectory_event("stats_error", error=f"{label}: {exc}", **self._event_kwargs())
+            return
+        log_trajectory_event(f"stats_{label}", stats=stats, **self._event_kwargs())
 
     def _handle_game(self, strategy, game):
         game_id = game.get("game_id")
         if game_id is not None:
             _GAME_STARTED_AT.setdefault(game_id, time.monotonic())
-        return super()._handle_game(strategy, game)
+        log_trajectory_event("observed", game, **self._event_kwargs())
+        try:
+            action = strategy(game)
+        except Exception as exc:
+            log_trajectory_event("strategy_exception", game, error=repr(exc), **self._event_kwargs())
+            logger.exception(f"Strategy error for game {game_id}")
+            return False
+
+        log_trajectory_event("action", game, action=action, **self._event_kwargs())
+        try:
+            result = self.move(game_id, action)
+        except Exception as exc:
+            log_trajectory_event("move_exception", game, action=action, error=repr(exc), **self._event_kwargs())
+            raise
+        log_trajectory_event("move_result", game, action=action, response=result, **self._event_kwargs())
+
+        if result.get("valid") is False:
+            attempts = result.get("attempts_left")
+            suffix = f" ({attempts} attempts left)" if attempts is not None else ""
+            logger.warning(
+                f"Game {game_id}: move rejected as invalid — "
+                f"{result.get('error')!r}{suffix}"
+            )
+        else:
+            logger.info(f"Move result: {result}")
+        if result.get("game_over"):
+            logger.info(f"Game {game_id} finished! Result: {result.get('result')}")
+            return True
+        return False
 
     def move(self, game_id: str, action: dict) -> dict:
         response = super().move(game_id, action)
@@ -204,6 +373,8 @@ class LoggingGleeClient(GleeClient):
                     agent_name=self.agent_name,
                     agent_version=self.agent_version,
                     strategy_version=self.strategy_version,
+                    commit_hash=self.commit_hash,
+                    random_seed=self.random_seed,
                 )
                 if self.update_opponent_profile:
                     opponent_model.record_outcome(game, result)

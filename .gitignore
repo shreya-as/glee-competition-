@@ -5,3 +5,7 @@ __pycache__/
 logs/
 *.log
 *.pid
+# Raw platform downloads (about 1 GB, include other agents' messages) and intermediate audit files.
+# The public, derived data the paper uses is in paper_data/.
+final_logs/
+analysis/out/

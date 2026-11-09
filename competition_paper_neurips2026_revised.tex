@@ -1,0 +1,188 @@
+\documentclass{article}
+
+\usepackage[preprint]{neurips_2026}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{amsfonts}
+\usepackage{nicefrac}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{array}
+\usepackage{float}
+
+\setlength{\textfloatsep}{8pt plus 1pt minus 2pt}
+\setlength{\floatsep}{8pt plus 1pt minus 2pt}
+\setlength{\intextsep}{8pt plus 1pt minus 2pt}
+
+\title{Selective Adaptation and Reliability Lessons from a Hybrid GLEE Agent}
+
+\author{%
+Shreya Shahi\thanks{Corresponding author. GLEE Agent IDs: 12948c31da20, fe31f7e30f87, e9e0a158d9ac, 0a73f5941362, 8a2d59b9b0f2.} \\
+\texttt{shreyathakuri1372@gmail.com} \\
+\url{https://github.com/shreya-as/glee-competition-}
+}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We report a hybrid rule-based agent for the GLEE Competition and an audit of its evaluation. The agent combines economic thresholds with opponent profiles, deadline concessions, offline threshold calibration, and stochastic persuasion. The initial local-log analysis reported a negotiation agreement decline from 64.6\% to 30.6\%. Matching downloaded server histories and replays to local game IDs reveals incomplete outcomes, duplicate rows, mixed accounts, and overlapping strategy labels. In a shared late-run window, server-side negotiation agreement is 46.6\% for the baseline account and 51.3\% for the final-agent account, with conditional payoffs of 52.9K and 52.4K game units. These observations withdraw the earlier agreement-collapse interpretation; they do not establish a strategic improvement. The main contribution is a reproducible measurement audit showing how instrumentation and strategy provenance can change the conclusions of a live economic-agent evaluation.
+\end{abstract}
+
+\section{Agent Overview}
+
+GLEE contains three language-based economic game families: bargaining over a divisible surplus, buyer--seller negotiation, and repeated persuasion under asymmetric information~[1]. We built an agent that avoids external LLM calls during play and instead uses economically interpretable rules with narrow adaptive components. This choice reflects three development constraints: the server requires strict action schemas, games can run concurrently, and payoff scales vary by orders of magnitude. Invalid actions and timeouts can prevent an otherwise acceptable deal; their frequency and attribution require separate measurement.
+
+The submitted fleet used five accounts with versioned strategies. V1--V4 each introduce one component in code; V5--V9 combine development changes. Accounts changed versions during the competition, and some local V8 and V9 labels overlap on the same game IDs. Version names therefore describe intended policies, while account and time-window provenance determine which empirical comparisons are defensible. The live runs were not randomized controls.
+
+\begin{table}[H]
+\caption{Strategy versions used in the local analysis.}
+\label{tab:versions}
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+Version & Status & Main behavior \\
+\midrule
+V0 & Baseline & Vanilla deterministic policy \\
+V1 & Diagnostic & Opponent modeling in bargaining/negotiation \\
+V2 & Diagnostic & Negotiation concession schedule \\
+V3 & Diagnostic & Learned-threshold calibration \\
+V4 & Diagnostic & Persuasion model v2 only \\
+V5--V8 & Bundled & Mixed adaptive bargaining, negotiation, and persuasion policies \\
+V9 & Final & Deadline-aware bargaining, value-protecting negotiation, exploit-heavy persuasion \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Technical Approach}
+
+The implementation uses the official Python GLEE SDK and dispatches each game to a family-specific policy. The final V9 policy is implemented in \texttt{advanced\_agent.py}; the vanilla baseline is in \texttt{vanilla\_agent.py}; V1--V4 are in \texttt{experiment\_agent.py}. The historical fleet logger writes when a move response reaches its outcome path. This misses opponent-terminated games and also produced repeated rows and rows without terminal results. V7--V9 persuasion uses random exploration and probabilistic low-quality endorsement decisions. The historical game rows contain no random seeds. Later runner support for optional seeds does not make those runs reproducible.
+
+\paragraph{Bargaining.}
+V0 proposes an even split and accepts any offer worth at least 40\% of the pool. V9 keeps this conservative base but adds opponent classification, discount-factor patience adjustment when visible, and deadline-aware concessions. It opens slightly in its own favor, lowers its acceptance threshold as the deadline approaches, and settles sooner against aggressive opponents.
+
+\paragraph{Negotiation.}
+V0 accepts any profitable offer and otherwise counters from a fixed fraction of its private valuation. V9 instead protects surplus share. Under complete information, it estimates total surplus and accepts only if its own share clears a decreasing threshold. Under hidden information, it blends a hand-written margin threshold with a logistic model from \texttt{learned\_model.py}, trained offline by \texttt{train\_model.py} on final logged decision points.
+
+\paragraph{Persuasion.}
+The persuasion module tracks six argument frames: economic, fairness, safety, social, convenience, and long-term. V9 uses opponent-specific and global profiles with a contextual bonus based on price, prior probability, and expected buyer value. Arguments are scored by estimated payoff and a variance penalty. The seller usually declines to recommend known low-quality products, but can endorse low quality stochastically near the end when the price or prior makes the expected payoff high.
+
+\section{Strategic Design}
+
+The strategic design is intentionally asymmetric across the three game families. Bargaining has a strong simple baseline, so V9 changes only thresholds and timing. Negotiation exposes more economic structure, especially when both valuations are visible, so V9 uses explicit surplus-share reasoning. Persuasion is closer to a high-variance bandit problem: the agent must choose an argument frame before observing whether that frame works for a particular buyer, price, and quality setting~[6,7].
+
+\begin{figure}[t]
+\centering
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{1.05in}>{\raggedright\arraybackslash}p{1.25in}p{2.95in}}
+\toprule
+Family & Base rule & Adaptive layer \\
+\midrule
+Bargaining & Accept above pool threshold & Opponent class, discount-factor patience, deadline concession \\
+Negotiation & Accept profitable offers & Surplus-share threshold, hidden-information margin model, learned calibration \\
+Persuasion & Expected-value buyer rule & Opponent profiles, argument payoff estimates, exploration penalty \\
+\bottomrule
+\end{tabular}
+\caption{Compact representation of the final agent architecture. The adaptive layer is deliberately narrow: each component adjusts an interpretable economic rule.}
+\label{fig:architecture}
+\end{figure}
+
+Surplus protection creates a design tradeoff: a higher acceptance threshold can preserve value on an accepted deal while rejecting other profitable offers. Whether it raises expected payoff depends on opponent responses and the game distribution. We distinguish this motivation from an empirical finding: the audited comparison below does not establish that V9 increased payoff conditional on negotiation agreement.
+
+\section{Evaluation}
+
+\paragraph{Artifacts and outcome definitions.}
+We compare the saved server history/replay exports with the historical local JSONL files. The baseline export is \texttt{final\_v0\_shreya\_agent\_4\_history\_with\_replays.json}, containing 3,265 games for \texttt{shreya\_agent\_4}; the final-account export is \texttt{final\_v9\_sh\_agent1\_all\_games\_with\_replays.json}, containing 7,787 games for \texttt{sh\_agent1}. Both reside in \texttt{final\_logs/}. We check unique server IDs and agreement between history and replay IDs, families, roles, and results. All 11,052 records pass these checks. We have not independently verified download pagination, so these counts describe the saved exports, not guaranteed complete competition histories.
+
+Coverage uses game IDs within the same account. Performance uses the server result and the payoff belonging to \texttt{history.your\_player}; duplicate local rows never receive extra weight. Success means agreement for bargaining and negotiation, and strictly positive own payoff for persuasion. The latter is a payoff proxy, not an argument-level purchase or persuasion success measure. Unconditional means include zeros and negative payoffs. Payoffs are reported in game units; their monetary scales are configuration-dependent.
+
+\paragraph{Account, duplicate, and strategy provenance.}
+The local V0 file contains 2,772 rows across two accounts. Only 1,103 belong to the baseline export's account; the other 1,669 cannot be counted as missing from that account's server history. The local V9 file contains 3,266 rows but only 3,003 unique game IDs, leaving 263 repeated rows. Among IDs shared with the full exports, 43 baseline games and 101 final-account games have no local terminal result. Where a local terminal outcome and payoff are available, they agree with the server outcome, payoff, and role.
+
+The filename ``V9'' also overstates strategy identity. Of its 7,787 server games, 586 appear in the local V8 file, including 114 that appear under both V8 and V9 labels. This establishes overlapping instrumentation; it does not reveal which strategy generated every move. Treating the entire export as an exclusive V9 run would add another confound.
+
+\paragraph{Shared-window comparison.}
+For the main outcome comparison, we retain games started in the overlap of the two exports' start-time ranges: 29 August 2026, 12:26:58.465813--18:48:53.297024 UTC (18:11:58 on 29 August to 00:33:53 on 30 August in Nepal). The interval contains 3,259 baseline-account games and 3,885 final-account games. It begins after the last observed V8 local row at 11:54:36 UTC. None of its final-account game IDs appears in the local V8 file; 1,513 have a local V9 label, while 2,372 have no local version evidence. We retain ``V0'' and ``V9'' as short account-window labels below, with this provenance qualification. A common clock window reduces temporal mismatch but does not control account ratings, opponents, configurations, or adaptive state.
+
+\input{analysis/audit_tables.tex}
+
+\paragraph{Measured selection bias.}
+Table~\ref{tab:coverage} separates full-export coverage from the restricted outcome comparison. Table~\ref{tab:selection} measures selection within the shared window using server outcomes for both matched and missing games. In negotiation, the baseline's matched subset has 63.2\% agreement and its API-only subset has 35.5\%; for the final account these rates are 33.2\% and 58.6\%. Thus local membership selects different outcome distributions in the two accounts, and the bias has different directions. Local agreement rates cannot be treated as universal lower bounds.
+
+Replay decisions identify 90 baseline and 490 final-account negotiation agreements accepted by the opponent and absent from the version-labelled local file. These are 8.4\% and 36.5\% of all negotiation games in the respective windows. Bargaining has another 589 and 532 missing opponent acceptances. Opponent termination is a confirmed mechanism, but it does not explain every gap: 137 baseline and 71 final-account negotiation agreements accepted by our own account are also missing. Their absence could reflect incomplete local collection or instrumentation paths; the saved artifacts do not resolve the cause.
+
+\paragraph{Bargaining.}
+The shared-window agreement rates are 92.3\% and 96.4\%; mean payoffs are 144.2K and 159.6K game units for the baseline and final accounts. These descriptive outcomes are consistent with frequent settlement. They do not isolate the effects of deadline concessions or opponent classification, and we do not retain the earlier claim of faster resolution without a comparable timing analysis.
+
+\paragraph{Negotiation.}
+The initial submitted local-row comparison reported 64.6\% versus 30.6\% agreement and 34.2K versus 53.6K payoff conditional on agreement. Those figures used different account/time mixtures and incomplete local outcomes; they are historical claims, not corrected estimates. The shared-window server comparison gives 46.6\% versus 51.3\% agreement, unconditional payoff 24.6K versus 26.9K, and conditional payoff 52.9K versus 52.4K. We withdraw both the agreement-collapse claim and the claim that this comparison demonstrates increased conditional payoff from value protection. The observed account differences do not identify the effect of the bundled V9 policy.
+
+\paragraph{Persuasion.}
+Positive-payoff rates are 53.9\% and 52.9\%, with unconditional mean payoffs of 2.93M and 3.11M. The mean conditional on positive payoff is 5.49M and 5.90M. These are game-level outcomes pooled across roles and configurations. They do not establish that a particular argument frame improved buyer behavior. The stochastic policy, unmatched opponents, and scale variation leave the persuasion adaptation inconclusive.
+
+\paragraph{Diagnostic versions and learned calibration.}
+V1--V4 change one component at the code level, but the historical comparisons are not controlled ablations. In particular, V4 changes persuasion while its local negotiation payoff also changes, demonstrating that a cross-version payoff shift cannot by itself identify a component effect. We use this ladder to document implementation choices and withdraw component-level performance attribution.
+
+The saved bargaining and negotiation models contain 7,992 and 5,969 training examples. Their stored accuracies are 98.9\% and 83.9\%, compared with majority-class accuracies of 95.6\% and 51.9\%; stored log losses are 0.0315 and 0.4660. Inspection of \texttt{train\_model.py} shows that fitting and evaluation use the same examples. These are training metrics, not held-out validation. Features are own surplus share (bargaining) or valuation-relative margin (negotiation), plus capped round fraction. Terminal-only, selectively collected examples do not estimate the counterfactual value of accepting an intermediate offer. We make no claim of validated generalization or causal benefit from this model.
+
+\paragraph{Reliability observations.}
+Table~\ref{tab:reliability} reports server outcome categories separately from strategic no-deals and walkaways. In the shared window, the baseline account's games contain 22 timeouts and one invalid-move-limit outcome; the final account's games contain 14 timeouts and two invalid-move-limit outcomes. These counts include events potentially caused by either participant. They neither establish our agent's own schema-error rate nor quantify concurrency failures. The measured reliability finding is the evaluation pipeline's coverage and provenance failure. A claim that runtime failures outweighed strategic gains would require actor-level error attribution and a controlled comparison that these artifacts do not supply.
+
+\section{Limitations and Reproducibility}
+
+The comparison is observational. Common start-time support removes the known early V8 overlap, but does not balance opponent matching, initial account ratings, roles, economic scales, or shared profile state. The saved histories identify opponent type without providing a stable opponent ID for matching. V9 also bundles mechanisms. Accordingly, none of the reported differences establishes component-level or overall strategic superiority. Repeated opponents and adaptive state also prevent treating all games as independent randomized trials.
+
+The server export is more informative than the local outcome path, but its completeness and the strategy labels of unlogged games remain unverified. V1--V4 results retain local-collection limitations. We did not preserve official leaderboard snapshots in the audited artifacts, so we cannot report an official rank or show that raw payoff differences improved the competition objective. Per-game \texttt{rating\_delta} fields do not reconstruct a leaderboard or its other participants' ratings.
+
+Historical stochastic persuasion decisions cannot be reproduced exactly because their random seeds and runtime revisions were not recorded. A later optional process seed does not recover the old random stream; concurrent action scheduling and changing profile files would also need to be captured. Complete future provenance should include per-game seeds, move-level strategy/version identifiers, profile snapshots, and actor-attributed terminal and error events.
+
+The offline audit is reproducible from the saved artifacts with \texttt{python analysis/audit\_glee\_logs.py}. It uses the Python standard library, checks history/replay consistency, joins game IDs by account, and generates the tables included in this manuscript. The accompanying \texttt{analysis/audit\_results.json} records source SHA-256 hashes, exact windows, full-export and shared-window statistics, acceptance attribution, and descriptive role/configuration/scale strata. \texttt{analysis/audit\_report.md} documents the method and remaining gaps. These checks reproduce the analysis of the saved logs; they do not reproduce the live tournament.
+
+\section{Lessons}
+
+The audit changes the paper's empirical conclusion. The apparent negotiation collapse came from an unaudited local comparison whose account composition, duplicate handling, missing terminal results, and coverage varied across versions. Server replays recover opponent acceptances and show how strongly the selected samples differ. Restricting time support also avoids known V8-labelled games in the final-account export.
+
+The resulting contribution is a case study in measurement reliability for live economic agents. Lightweight adaptation remains a plausible design choice, but these observations do not establish its advantage. Future evaluations need complete reconciled outcomes, move-level strategy provenance, held-out model validation, reproducible stochastic decisions, and official objective snapshots before assigning strategic credit to a version change.
+
+\section*{Acknowledgments}
+We thank the organizers of the GLEE Competition and the IAB Workshop at NeurIPS 2026 for hosting the competition. No external funding supported this work. The author declares no competing interests.
+
+\section*{References}
+\small
+
+[1] Shapira, E., Madmon, O., Reinman, I., Amouyal, S. J., Reichart, R., and Tennenholtz, M. GLEE: A Unified Framework and Benchmark for Language-based Economic Environments. \emph{arXiv:2410.05254}.
+
+[2] Rubinstein, A. Perfect Equilibrium in a Bargaining Model. \emph{Econometrica}, 50(1):97--109, 1982.
+
+[3] Nash, J. F. The Bargaining Problem. \emph{Econometrica}, 18(2):155--162, 1950.
+
+[4] Crawford, V. P. and Sobel, J. Strategic Information Transmission. \emph{Econometrica}, 50(6):1431--1451, 1982.
+
+[5] Camerer, C. F. \emph{Behavioral Game Theory: Experiments in Strategic Interaction}. Princeton University Press, 2003.
+
+[6] Auer, P., Cesa-Bianchi, N., and Fischer, P. Finite-time Analysis of the Multiarmed Bandit Problem. \emph{Machine Learning}, 47:235--256, 2002.
+
+[7] Sutton, R. S. and Barto, A. G. \emph{Reinforcement Learning: An Introduction}. MIT Press, 2nd edition, 2018.
+
+[8] Lewis, M., Yarats, D., Dauphin, Y. N., Parikh, D., and Batra, D. Deal or No Deal? End-to-End Learning for Negotiation Dialogues. In \emph{Proceedings of EMNLP}, 2017.
+
+[9] Brown, N. and Sandholm, T. Superhuman AI for Multiplayer Poker. \emph{Science}, 365(6456):885--890, 2019.
+
+[10] Osborne, M. J. and Rubinstein, A. \emph{A Course in Game Theory}. MIT Press, 1994.
+
+[11] Myerson, R. B. \emph{Game Theory: Analysis of Conflict}. Harvard University Press, 1991.
+
+[12] von Neumann, J. and Morgenstern, O. \emph{Theory of Games and Economic Behavior}. Princeton University Press, 1944.
+
+[13] Lai, T. L. and Robbins, H. Asymptotically Efficient Adaptive Allocation Rules. \emph{Advances in Applied Mathematics}, 6(1):4--22, 1985.
+
+[14] Silver, D., Schrittwieser, J., Simonyan, K., Antonoglou, I., Huang, A., Guez, A., Hubert, T., Baker, L., Lai, M., Bolton, A., Chen, Y., Lillicrap, T., Hui, F., Sifre, L., van den Driessche, G., Graepel, T., and Hassabis, D. Mastering the Game of Go without Human Knowledge. \emph{Nature}, 550:354--359, 2017.
+
+[15] Park, J. S., O'Brien, J. C., Cai, C. J., Morris, M. R., Liang, P., and Bernstein, M. S. Generative Agents: Interactive Simulacra of Human Behavior. In \emph{Proceedings of UIST}, 2023.
+
+\end{document}

@@ -1,0 +1,235 @@
+\documentclass{article}
+
+% Use the official NeurIPS 2026 style when it is uploaded next to this file;
+% otherwise fall back to plain article margins so the paper still compiles.
+\IfFileExists{neurips_2026.sty}{%
+  \usepackage[preprint]{neurips_2026}%
+}{%
+  \usepackage[margin=1in]{geometry}%
+}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{amsfonts}
+\usepackage{nicefrac}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{array}
+\usepackage{float}
+
+\setlength{\textfloatsep}{8pt plus 1pt minus 2pt}
+\setlength{\floatsep}{8pt plus 1pt minus 2pt}
+\setlength{\intextsep}{8pt plus 1pt minus 2pt}
+\newcommand{\barcell}[2]{\makebox[0.88in][l]{\color{#1}\rule{#2in}{5pt}}}
+
+\title{Selective Adaptation and Reliability Lessons from a Hybrid GLEE Agent}
+
+\author{%
+Shreya Shahi\thanks{Corresponding author. GLEE Agent IDs: 12948c31da20, fe31f7e30f87, e9e0a158d9ac, 0a73f5941362, 8a2d59b9b0f2.} \\
+\texttt{shreyathakuri1372@gmail.com} \\
+\url{https://github.com/shreya-as/glee-competition-}
+}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We describe a hybrid agent for the GLEE Competition, which evaluates language-based agents in bargaining, negotiation, and persuasion games. The design combines deterministic economic rules with narrow adaptive components: opponent-history features, deadline-aware concessions, a small learned threshold model, and payoff-aware persuasion exploration. We evaluate seven strategy versions, run on five competition accounts, using 75{,}258 official platform game records with replays. Our local development logger never recorded games that ended on the opponent's move (45--51\% of games). On its data, the final policy (V9) appeared to cut negotiation agreement from 64.6\% for the vanilla baseline (V0) to 30.6\%, and within the same time window the logger reversed the V0--V9 comparison. In the last 6.3 hours of our runs, five versions played at the same time. In that window V9 reached 90.1\% agreement on feasible negotiation games against 81.1\% for V0, with higher normalized payoff ($p=0.002$). Bargaining agreement rose from 92.5\% to 96.3\%, and V9's persuasion showed no detectable difference. The platform records also expose two failures: a learned threshold that accepted 160 money-losing deals, and stale re-sent decisions present in 58--94\% of failed bargaining games in that window. In GLEE, measurement and reliability errors can outweigh strategy.
+\end{abstract}
+
+\section{Agent Overview}
+
+GLEE contains three language-based economic game families: bargaining over a divisible surplus, buyer--seller negotiation, and repeated persuasion under asymmetric information~[1]. Recent agents for such settings often use LLM dialogue~[15], and the strongest game-playing systems use large-scale search and self-play~[9,14]; we took a lighter route. Our agent makes no LLM calls during play; each family uses an interpretable economic rule, and adaptive components only tune that rule's parameters. Three constraints motivated this: the server enforces strict action schemas, games run concurrently, and payoffs range from $10^2$ to $10^6$.
+
+We ran five accounts in parallel (Table~\ref{tab:versions}). In window W1 (28~Aug, 10:58--15:30 UTC), all five accounts ran V0 and the single-change versions V1--V4. In window W3 (29~Aug, 12:28--18:48 UTC), all five accounts were live with V0, V1, V3, V7, and V9. W3 is our main window because it contains the final policy. Both comparisons are contemporaneous but observational (Section~5).
+
+\begin{table}[H]
+\caption{Strategy versions. ``Changes'' lists families that differ from V0; others run the vanilla rule. Accounts: \texttt{sh\_agent1} (1), \texttt{shreyaAgent2} (2), \texttt{Agent\_3} (3), \texttt{shreya\_agent\_4} (4), \texttt{agent\_5} (5).}
+\label{tab:versions}
+\centering
+\small
+\begin{tabular}{llll}
+\toprule
+Version & Changes & Main behavior & Account (window) \\
+\midrule
+V0 & none & Vanilla deterministic baseline & 1 (W1), 4 (W3) \\
+V1 & barg., neg. & Opponent modeling & 2 (W1, W3) \\
+V2 & neg. & Concession schedule & 3 (W1) \\
+V3 & neg. & Learned-threshold calibration & 4 (W1), 3 (W3) \\
+V4 & pers. & Persuasion model v2 & 5 (W1) \\
+V7 & all & Adaptive bundle, contextual-bandit persuasion & 5 (W3) \\
+V9 & all & Deadline-aware bargaining, surplus-share negotiation & 1 (W3) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[!t]
+\centering
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{1.05in}>{\raggedright\arraybackslash}p{1.25in}p{2.7in}}
+\toprule
+Family & Base rule & Adaptive layer \\
+\midrule
+Bargaining & Accept above pool threshold & Opponent class, discount-factor patience, deadline concession \\
+Negotiation & Accept profitable offers & Surplus-share threshold, hidden-information margin model, learned calibration \\
+Persuasion & Expected-value buyer rule & Opponent profiles, risk-penalized argument payoff estimates, exploration \\
+\bottomrule
+\end{tabular}
+\caption{Final agent architecture: each adaptive component adjusts an interpretable economic rule.}
+\label{fig:architecture}
+\end{figure}
+
+\section{Technical Approach}
+
+Using the official Python GLEE SDK, each game goes to a family-specific policy (Figure~\ref{fig:architecture}; V9: \texttt{advanced\_agent.py}; V0: \texttt{vanilla\_agent.py}; V1--V4: \texttt{experiment\_agent.py}).
+
+\paragraph{Bargaining.}
+V0 proposes an even split and accepts any offer worth at least 40\% of the pool. V9 opens at 53.5\% and accepts at 42.5\%, shifted by opponent class, by relative patience when the discount factors are visible, and by a 10\% weight on the learned threshold. Following alternating-offer bargaining with discounting~[2,3,10], it moves toward an even split and cuts its acceptance threshold by up to 8 points near the horizon (34\% in the final round).
+
+\paragraph{Negotiation.}
+V0 accepts any offer with non-negative margin and otherwise counters at a fixed fraction of its private value. When the opponent's value is visible, V9 accepts only if its share of the total surplus clears a threshold that falls from 52\% with the round. Otherwise, since end-to-end learned negotiators are hard to control~[8], it weights a hand-set margin threshold by 0.75 and the logistic model in \texttt{learned\_model.py} by 0.25, clips the learned margin to $[0, 0.12]$, and accepts and counters only at a profit. V3 uses the learned threshold alone, which can be negative.
+
+\paragraph{Persuasion.}
+The seller picks one of six frames: economic, fairness, safety, social, convenience, and long-term. V9 scores frames with opponent-specific and global profiles plus a contextual bonus from price, prior, and expected buyer value. After four attempts against an opponent it plays the best frame 97\% of the time, else the global profile or a UCB-style bonus~[13]. It rarely endorses known low-quality products, and then only at random in the last rounds when the price or prior is high.
+
+\section{Strategic Design}
+
+Bargaining has a strong simple baseline, so V9 changes only thresholds and timing. Negotiation exposes more economic structure, so V9 reasons explicitly about surplus shares~[11]. Persuasion is a repeated strategic-information problem~[4] in which the seller must pick a frame before learning whether it works for a given buyer, price, and quality. We treat frame choice as a bandit~[6,7,13], and the buyer uses an expected-value rule that weights possible losses 1.5 times~[12]. Opponent profiles assume that other agents respond in boundedly rational, partly predictable ways~[5].
+
+Negotiation carries a known risk: demanding a fairer split raises payoff per deal but can lower total payoff if deals fail. Local logs suggested V9 fell into this trap; Section~\ref{sec:eval} shows the logger caused this.
+
+\section{Evaluation}
+\label{sec:eval}
+
+\paragraph{Data and method.}
+We use the official GLEE game histories with replays for each account: 16{,}693, 14{,}767, 14{,}695, 14{,}780, and 14{,}323 games for accounts 1--5, covering the whole competition; we call these platform records. Each game is assigned to a version through its \texttt{game\_id} in the local logs, or otherwise by run window. On account~1, V8 and V9 overlapped for 5.4 hours; we leave the 1{,}892 overlap games that cannot be tied to one version (1{,}778 unlogged, 114 logged under both), and 1{,}809 games started during restarts or at version boundaries, unassigned. W1 and W3 contain no overlaps and only 8 unassigned games, all in the last 30 seconds of W1. Success is agreement (bargaining, negotiation) or positive payoff (persuasion). Payoffs are normalized by the pool (bargaining), the surplus (negotiation), or price $\times$ rounds (persuasion). In 45\% of negotiation games the seller's value is at least the buyer's, so refusing is correct; negotiation metrics use only feasible games. We report 95\% Wilson and bootstrap intervals, two-proportion $z$-tests, and Welch $t$-tests~[16]; the significant V9 results survive Bonferroni correction for the 24 W3 tests against V0 ($\alpha\approx0.0021$).
+
+\paragraph{Logger bias.}
+The local logger wrapped our own move submission, so it saw a game only if our move ended it. In both windows, replays show that 45--51\% of games ended on the opponent's move (Figure~\ref{fig:coverage}), and none of them were logged. In W3 the logger also missed 19--38\% of own-move endings, for reasons we could not determine; in W1 it captured all of them. The bias depended on the policy. V0 accepts profitable offers itself, so most of its deals end on its own move. V9 rejects and counters more often (87\% of its feasible-game decisions, against 75\% for V0), and when the opponent accepts a counter-offer the deal never reaches the log: 66\% of V9's feasible negotiation games ended on the opponent's move, against 27\% for V0. Over the same hours, local logs give V0 63.4\% and V9 33.3\% negotiation agreement, the apparent ``collapse''. Platform records give 46.6\% and 51.3\%. The same bias inflated V0's local figure: in W1, local logs give V0 65.3\% negotiation agreement (64.6\% over the full local V0 log), against 49.3\% in platform records.
+
+\begin{figure}[!t]
+\centering
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+Version & Games & Opp.\ ended & Logged overall & Neg.\ agree (local) & Neg.\ agree (platform) \\
+\midrule
+V0 & 3{,}235 & 46.8\% & 33.7\% & 63.4\% & 46.6\% \\
+V1 & 3{,}149 & 46.5\% & 34.9\% & 59.6\% & 44.6\% \\
+V3 & 3{,}152 & 47.4\% & 33.7\% & 67.9\% & 53.4\% \\
+V7 & 3{,}072 & 46.6\% & 32.7\% & 49.2\% & 42.6\% \\
+V9 & 3{,}867 & 51.4\% & 38.9\% & 33.3\% & 51.3\% \\
+\bottomrule
+\end{tabular}
+\caption{Logger coverage in W3, with agreement over all negotiation games: ``local'' uses only games our logger recorded, ``platform'' uses every game. Local logs overstate agreement for every version except V9, reversing the V0--V9 comparison.}
+\label{fig:coverage}
+\end{figure}
+
+\begin{figure}[!t]
+\centering
+\small
+\begin{tabular}{llrlll}
+\toprule
+Family & Ver. & N & Success & Norm.\ payoff [95\% CI] & $\Delta$ vs.\ V0 ($p$) \\
+\midrule
+Bargaining & V0 & 1069 & \barcell{blue}{0.81} 92.5\% & 0.441 [0.429, 0.452] & -- \\
+Bargaining & V7 & 1042 & \barcell{gray}{0.84} 95.1\% & 0.442 [0.432, 0.451] & $+$0.001 (0.87) \\
+Bargaining & V9 & 1287 & \barcell{teal}{0.85} 96.3\% & 0.449 [0.440, 0.457] & $+$0.008 (0.28) \\
+Negotiation & V0 & 572 & \barcell{blue}{0.71} 81.1\% & 0.350 [0.322, 0.381] & -- \\
+Negotiation & V7 & 580 & \barcell{gray}{0.64} 72.2\% & 0.366 [0.341, 0.390] & $+$0.015 (0.43) \\
+Negotiation & V9 & 736 & \barcell{teal}{0.79} 90.1\% & 0.406 [0.387, 0.424] & $+$0.055 (0.002) \\
+Persuasion & V0 & 1107 & \barcell{blue}{0.47} 53.7\% & 0.430 [0.398, 0.465] & -- \\
+Persuasion & V7 & 1021 & \barcell{gray}{0.40} 45.7\% & 0.400 [0.366, 0.434] & $-$0.030 (0.23) \\
+Persuasion & V9 & 1245 & \barcell{teal}{0.47} 52.9\% & 0.438 [0.404, 0.473] & $+$0.008 (0.75) \\
+\bottomrule
+\end{tabular}
+\caption{W3 outcomes from platform records, with all versions live at the same time. Bars: success rate (blue V0, gray V7, teal V9). Negotiation uses feasible games; V1 and V3 are in the text.}
+\label{fig:w3}
+\end{figure}
+
+\paragraph{Bargaining behavior.}
+In W3 (Figure~\ref{fig:w3}), V9 agreed in 96.3\% of games against 92.5\% for V0 ($z=4.10$, $p<10^{-4}$), but normalized payoff did not change ($p=0.28$). As shown under reliability below, most failed bargaining games contained a stale re-sent decision, and V9 still agreed in more of those games than V0 (84.8\% vs.\ 73.3\%). We therefore cannot credit the gain to the deadline schedule alone.
+
+\paragraph{Negotiation behavior.}
+On feasible games, V9 agreed in 90.1\% of cases against 81.1\% for V0 ($z=4.66$, $p<10^{-5}$), and its normalized payoff rose from 0.350 to 0.406 ($p=0.002$). Payoff per agreement moved little (0.451 vs.\ 0.432), so the gain came mostly from closing more deals. Platform records do show the agreement--value trade-off, but for V7: it lost 8.9 points of agreement ($p<0.001$) while raising payoff per deal to 0.507, with no significant change in net payoff ($p=0.43$). V1 (77.7\%) and V3 (81.8\%) did not differ from V0, nor did any single change in W1 (Figure~\ref{fig:ablations}).
+
+\paragraph{Persuasion behavior.}
+No variant beat V0. V9 differed by $-0.9$ points in success ($p=0.66$) and $+0.008$ in payoff ($p=0.75$). V7 had lower success (45.7\%, $p<0.001$) but no significant payoff difference ($p=0.23$). In W3, the three identical vanilla persuasion arms (V0, V1, V3) span 0.8 points, but in W1 the four vanilla arms (V0--V3) span 7.1 points (44.0--51.1\%) at about 730 games each, and V2 differs from V0 by 6.3 points ($p=0.015$) although both run the same persuasion rule. Such gaps can arise from account or matchmaking effects alone, so persuasion is a null result.
+
+\begin{figure}[!t]
+\centering
+\small
+\begin{tabular}{llrlr}
+\toprule
+Version & Change & N & Neg.\ success ($p$ vs.\ V0) & Norm.\ payoff ($p$) \\
+\midrule
+V0 & Vanilla control & 406 & \barcell{blue}{0.76} 86.0\% & 0.349 \\
+V1 & Opponent model & 409 & \barcell{teal}{0.72} 81.7\% (0.10) & 0.363 (0.54) \\
+V2 & Concession schedule & 398 & \barcell{teal}{0.75} 84.9\% (0.68) & 0.354 (0.81) \\
+V3 & Learned threshold & 403 & \barcell{teal}{0.75} 85.4\% (0.81) & 0.348 (0.97) \\
+V4 & Persuasion only (vanilla neg.) & 410 & \barcell{blue}{0.73} 82.9\% (0.23) & 0.338 (0.63) \\
+\bottomrule
+\end{tabular}
+\caption{W1 negotiation ladder from platform records (feasible games), with V0 running at the same time. No change differs from V0; V4 runs V0's negotiation rule, so its gap is a placebo difference.}
+\label{fig:ablations}
+\end{figure}
+
+\paragraph{Reliability behavior.}
+In W1, at most 7 games per version contained a move the replay marks invalid; in W3, 14--23\% of bargaining games on every account did. Over 98\% of these moves were an \texttt{accept}/\texttt{reject} payload sent when the server expected an offer, and most came less than a second after a valid decision in the same game, which fits an agent re-sending its decision from a stale copy of the game state. Our run logs record a server rejection, almost always ``Offer must include alice\_gain and bob\_gain'', for 94.5\% of the affected V9 games and 64\% of the V0 games. Games with such a move reached agreement 73--85\% of the time, against 96--100\% without, and they account for 58--94\% of failed bargaining games. Longer games give more chances for such a move, so this is only an association. Across all game types, the V0 and V9 run logs show rejections in 4{,}126 games (3{,}394 ``It is not your turn'', 651 offer-format, 393 ``Game is not active''). In W3, timeouts and \texttt{invalid\_moves\_exceeded} endings were rare (at most 20 and 2 per version).
+
+\paragraph{Learned threshold.}
+The negotiation model is a two-feature logistic regression trained on 5{,}969 local decision points to predict agreement. On held-out data it predicts agreement well: 0.907 accuracy on the last 20\% of rows in logging order and 0.796 on a random 20\% split, against majority baselines of 0.534 and 0.503, although the rows come from the biased logger. More importantly, the policy accepts any offer whose margin exceeds the model's 50\%-agreement point, clipped to $[-0.10, 0.20]$, and in rounds 1--8 that point is negative. V3 thus accepted 160 money-losing deals (60 in W1, 99 in W3), losing on average 5.2\% of its own valuation per deal; V8, which reused this rule, accepted 153 more. V0, V2, V4, and V9 accepted none. The model predicted agreement, but the decision needed profit: a threshold maximizing expected profit (agreement probability times margin), floored at zero margin, would have avoided these losses.
+
+\paragraph{Official rating.}
+We kept no leaderboard snapshots during the competition; in October 2026 the public leaderboard ranked account~1 (V0, V8, V9) 91st, rating 1715.7. In W3 the official per-game \texttt{rating\_delta} averaged $-0.016$ for V9, $-0.037$ for V0, $-0.041$ for V1, $-0.045$ for V7, and $-0.124$ for V3: V9 lost the least rating per game and V3 the most. W1 ratings were noisier (V2 $+0.054$, V0 $-0.031$, V3 $-0.103$, V4 $-0.112$), so we treat rating as supporting evidence only.
+
+\section{Limitations and Reproducibility}
+
+W1 and W3 are contemporaneous, but versions ran on different accounts and the records give each opponent's type but not its identity or rating, so we could not observe how the platform paired agents and cannot fully exclude account effects; 122 of the 75{,}258 games (0.2\%) were against humans. Accounts running the identical vanilla rule differed by at most 1.0 point in W3 (V0 vs.\ V3 in bargaining; V0, V1, V3 in persuasion) but by 6.3 points in W1 (V0 vs.\ V2 in persuasion), so these effects can be non-trivial. V9 bundles changes in all three families, so its gains belong to the full policy; attributing them to single components would need one-at-a-time tests. V7--V9 persuasion used unseeded randomness, so individual decisions cannot be replayed exactly; aggregate results do not depend on such replays, and the fleet now accepts a \texttt{GLEE\_RANDOM\_SEED} that is written to every log row. Our repository's \texttt{paper\_data/} folder holds a per-game table of all platform records (without message text) and the log extracts we use; \texttt{analysis/check\_paper.py} recomputes every data-derived number in this paper from it.
+
+\section{Lessons}
+
+Our local logs supported a firm conclusion while missing half or more of the games. Because the bias depended on the policy, a strategic change altered the measurement itself. Three practices would have caught this: evaluate from platform records, run candidate policies at the same time alongside identical placebo arms, and score negotiation only on feasible games. On strategy, the evidence supports modest claims: V9's negotiation policy closed more feasible deals and earned more, its bargaining policy raised agreement while payoff stayed flat, persuasion frame selection did not improve on V0, and a learned component optimized for agreement accepted losing deals.
+
+\section*{Acknowledgments}
+We thank the organizers of the GLEE Competition and the IAB Workshop at NeurIPS 2026 for hosting the competition and providing game histories and replays. No external funding supported this work. The author declares no competing interests.
+
+\section*{References}
+\small
+
+[1] Shapira, E., Madmon, O., Reinman, I., Amouyal, S. J., Reichart, R., and Tennenholtz, M. GLEE: A Unified Framework and Benchmark for Language-based Economic Environments. \emph{arXiv:2410.05254}, 2024.
+
+[2] Rubinstein, A. Perfect Equilibrium in a Bargaining Model. \emph{Econometrica}, 50(1):97--109, 1982.
+
+[3] Nash, J. F. The Bargaining Problem. \emph{Econometrica}, 18(2):155--162, 1950.
+
+[4] Crawford, V. P. and Sobel, J. Strategic Information Transmission. \emph{Econometrica}, 50(6):1431--1451, 1982.
+
+[5] Camerer, C. F. \emph{Behavioral Game Theory: Experiments in Strategic Interaction}. Princeton University Press, 2003.
+
+[6] Auer, P., Cesa-Bianchi, N., and Fischer, P. Finite-time Analysis of the Multiarmed Bandit Problem. \emph{Machine Learning}, 47:235--256, 2002.
+
+[7] Sutton, R. S. and Barto, A. G. \emph{Reinforcement Learning: An Introduction}. MIT Press, 2nd edition, 2018.
+
+[8] Lewis, M., Yarats, D., Dauphin, Y. N., Parikh, D., and Batra, D. Deal or No Deal? End-to-End Learning for Negotiation Dialogues. In \emph{Proceedings of EMNLP}, 2017.
+
+[9] Brown, N. and Sandholm, T. Superhuman AI for Multiplayer Poker. \emph{Science}, 365(6456):885--890, 2019.
+
+[10] Osborne, M. J. and Rubinstein, A. \emph{A Course in Game Theory}. MIT Press, 1994.
+
+[11] Myerson, R. B. \emph{Game Theory: Analysis of Conflict}. Harvard University Press, 1991.
+
+[12] von Neumann, J. and Morgenstern, O. \emph{Theory of Games and Economic Behavior}. Princeton University Press, 1944.
+
+[13] Lai, T. L. and Robbins, H. Asymptotically Efficient Adaptive Allocation Rules. \emph{Advances in Applied Mathematics}, 6(1):4--22, 1985.
+
+[14] Silver, D., Schrittwieser, J., Simonyan, K., et al. Mastering the Game of Go without Human Knowledge. \emph{Nature}, 550:354--359, 2017.
+
+[15] Park, J. S., O'Brien, J. C., Cai, C. J., et al. Generative Agents: Interactive Simulacra of Human Behavior. In \emph{Proceedings of UIST}, 2023.
+
+[16] Kohavi, R., Tang, D., and Xu, Y. \emph{Trustworthy Online Controlled Experiments: A Practical Guide to A/B Testing}. Cambridge University Press, 2020.
+
+\end{document}

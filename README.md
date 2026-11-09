@@ -2,8 +2,9 @@
 
 Hybrid rule-based and adaptive agents for the GLEE Competition, which evaluates
 language-based agents in bargaining, negotiation, and persuasion games. The
-final system is described in
-`competition_paper_neurips2026_improved.tex`.
+agents and their evaluation are described in
+`competition_paper_neurips2026_revised_v3.tex`, the revised paper
+(`competition_paper_neurips2026_improved.tex` is the version first submitted).
 
 ## Overview
 
@@ -15,10 +16,13 @@ interpretable economic rules with narrow adaptive layers:
 - Negotiation: value-protecting acceptance thresholds and learned calibration.
 - Persuasion: payoff-aware argument selection with opponent and global profiles.
 
-The final V9 agent improves bargaining speed at similar payoff in local logs,
-but the paper documents an important tradeoff: negotiation value protection
-increased payoff conditional on agreement while reducing agreement rate.
-Persuasion remained noisy and high variance.
+The revised paper evaluates the agents from the official GLEE game records. In
+the last 6.3 hours of our runs, when five versions played at the same time, V9
+reached 90.1% agreement on feasible negotiation games against 81.1% for the
+vanilla baseline, with higher normalized payoff, and bargaining agreement rose
+from 92.5% to 96.3%. Persuasion showed no detectable difference. An earlier
+conclusion that V9's negotiation agreement collapsed came from the local logger,
+which never recorded games that ended on the opponent's move.
 
 ## Main Files
 
@@ -32,7 +36,9 @@ Persuasion remained noisy and high variance.
 - `learned_model.py`: loads learned bargaining and negotiation models.
 - `opponent_model.py`: per-opponent offer history and classification.
 - `persuasion_model_v2.py`: adaptive persuasion argument scoring.
-- `competition_paper_neurips2026_improved.tex`: NeurIPS 2026 competition paper.
+- `competition_paper_neurips2026_revised_v3.tex`: revised NeurIPS 2026 competition paper.
+- `paper_data/`: per-game data behind the paper (see `paper_data/README.md`).
+- `analysis/`: scripts that build `paper_data/` and check every number in the paper.
 
 ## Setup
 
@@ -93,9 +99,10 @@ The trainer reads `logs/games.jsonl` and writes:
 - `logs/learned_bargaining.json`
 - `logs/learned_negotiation.json`
 
-The paper notes a logging limitation: `game_logger.py` records games that end
-on this agent's move, so games accepted by opponents after our offers may be
-missing from local aggregates.
+`game_logger.py` records only games that end on this agent's move. The revised
+paper measures the effect: 45-51% of games ended on the opponent's move and were
+never logged, so local aggregates are biased. The paper uses the official
+platform records instead.
 
 ## Strategy Versions
 
@@ -107,25 +114,34 @@ missing from local aggregates.
 | V3 | Ablation | Learned-threshold calibration |
 | V4 | Ablation | Persuasion model v2 only |
 | V5-V8 | Development | Bundled adaptive bargaining, negotiation, and persuasion policies |
-| V9 | Final | Deadline-aware bargaining, value-protecting negotiation, exploit-heavy persuasion |
+| V9 | Final | Deadline-aware bargaining, surplus-share negotiation |
 
 ## Paper
 
-The competition paper is maintained as LaTeX:
+The revised paper is LaTeX in the NeurIPS 2026 style. Put `neurips_2026.sty`
+next to it (without it, the file falls back to plain margins):
 
 ```bash
-pdflatex competition_paper_neurips2026_improved.tex
+pdflatex competition_paper_neurips2026_revised_v3.tex
 ```
 
-The paper summarizes the architecture, local V0/V9 results, ablation evidence,
-limitations, and reliability lessons from the competition run.
+It evaluates the agents from the official GLEE game records, measures the local
+logger's bias, and reports the reliability failures found in the replays.
 
-## Reproducibility Notes
+## Reproducing the Paper
 
-Local analysis should aggregate each `logs/v*_games.jsonl` file by
-`game_family`. Count `outcome == "agreement"` as success for bargaining and
-negotiation, and positive payoff as success for persuasion.
+Every number in the paper can be checked from a fresh clone (Python 3.10 or
+newer, standard library only):
 
-The V9 policy bundles several mechanisms, so V0 versus V9 is a complete-policy
-comparison rather than a clean causal ablation. Exact persuasion reruns for
-later versions are not fully reproducible unless random seeds are logged.
+```bash
+python3 analysis/check_paper.py
+```
+
+It reads `paper_data/` and prints PASS or FAIL for each claim;
+`paper_data/README.md` describes the files. The raw GLEE downloads are not in
+the repository because the replays contain other teams' messages. The account
+owner rebuilds `paper_data/` from them with `bash analysis/run_api_audit.sh`.
+
+V9 bundles several mechanisms, so its results describe the full policy. V7-V9
+persuasion used unseeded randomness during the competition; set
+`GLEE_RANDOM_SEED` so that future runs record their seed.

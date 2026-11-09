@@ -27,6 +27,7 @@ Usage:
 import logging
 import multiprocessing
 import os
+import random
 import re
 import time
 from datetime import datetime, timezone
@@ -44,6 +45,8 @@ logger = logging.getLogger("fleet")
 
 # Rule-based moves are instant and free, so these can run wide open.
 RULE_AGENT_CONCURRENCY = 8
+MAX_TIME = float(os.environ["GLEE_MAX_TIME"]) if os.environ.get("GLEE_MAX_TIME") else None
+MAX_GAMES = int(os.environ["GLEE_MAX_GAMES"]) if os.environ.get("GLEE_MAX_GAMES") else None
 
 AGENT_NAMES = {1: "sh_agent1", 2: "shreyaAgent2", 3: "Agent_3", 4: "shreya_agent_4", 5: "agent_5"}
 AGENT_VERSIONS = {1: "v9", 2: "v1", 3: "v3", 4: "v0", 5: "v7"}
@@ -72,6 +75,13 @@ def _discover_keys() -> list[str]:
     return keys
 
 
+def _seed_for(index: int) -> int | None:
+    raw = os.environ.get("GLEE_RANDOM_SEED")
+    if raw is None:
+        return None
+    return int(raw) + index - 1
+
+
 def _client_for(index: int, api_key: str) -> LoggingGleeClient:
     base_url = os.environ.get("GLEE_API_URL")
     name = AGENT_NAMES.get(index, f"agent{index}")
@@ -83,6 +93,8 @@ def _client_for(index: int, api_key: str) -> LoggingGleeClient:
         "strategy_version": VERSION_LABELS.get(version, version),
         "log_path": os.path.join(os.path.dirname(__file__), "logs", f"{version}_games.jsonl"),
         "learning_log_path": os.path.join(os.path.dirname(__file__), "logs", f"{version}_learning.log"),
+        "trajectory_log_path": os.path.join(os.path.dirname(__file__), "logs", f"{version}_trajectory.jsonl"),
+        "random_seed": _seed_for(index),
         "update_opponent_profile": version in {"v1", "v5", "v8", "v9"},
     }
     if base_url:
@@ -123,6 +135,10 @@ def _run_rule_agent(index: int, api_key: str) -> None:
         handlers=[logging.StreamHandler(), logging.FileHandler(run_log_path)],
         force=True,
     )
+    seed = _seed_for(index)
+    if seed is not None:
+        random.seed(seed)
+        logging.getLogger("fleet").info("Random seed: %s", seed)
     strategy = _strategy_for(index)
     while True:
         try:
@@ -137,7 +153,12 @@ def _run_rule_agent(index: int, api_key: str) -> None:
                 run_log_path,
             )
             logging.getLogger("fleet").info(f"Agent {index} ({agent_name}, {strategy_name}) stats: {client.stats()}")
-            client.run(strategy, concurrency=RULE_AGENT_CONCURRENCY)
+            client.log_stats_snapshot("start")
+            client.run(strategy, concurrency=RULE_AGENT_CONCURRENCY, max_time=MAX_TIME, max_games=MAX_GAMES)
+            client.log_stats_snapshot("end")
+            if MAX_TIME is not None or MAX_GAMES is not None:
+                logging.getLogger("fleet").info("Bounded run finished for %s; exiting", agent_name)
+                return
             logging.getLogger("fleet").info("Agent %s run returned; restarting in 30s", agent_name)
             time.sleep(30)
         except Exception as exc:

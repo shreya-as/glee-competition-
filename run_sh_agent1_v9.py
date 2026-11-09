@@ -2,6 +2,7 @@
 
 import logging
 import os
+import random
 import time
 from datetime import datetime, timezone
 
@@ -17,6 +18,9 @@ AGENT_NAME = "sh_agent1"
 AGENT_VERSION = "v9"
 STRATEGY_LABEL = "leaderboard-push"
 CONCURRENCY = 4
+MAX_TIME = float(os.environ["GLEE_MAX_TIME"]) if os.environ.get("GLEE_MAX_TIME") else None
+MAX_GAMES = int(os.environ["GLEE_MAX_GAMES"]) if os.environ.get("GLEE_MAX_GAMES") else None
+RANDOM_SEED = int(os.environ["GLEE_RANDOM_SEED"]) if os.environ.get("GLEE_RANDOM_SEED") else None
 
 
 def main() -> None:
@@ -24,6 +28,9 @@ def main() -> None:
     if not api_key:
         print("Set GLEE_API_KEY in .env")
         raise SystemExit(1)
+
+    if RANDOM_SEED is not None:
+        random.seed(RANDOM_SEED)
 
     log_dir = os.path.join(os.path.dirname(__file__), "logs")
     os.makedirs(log_dir, exist_ok=True)
@@ -43,6 +50,8 @@ def main() -> None:
         "strategy_version": STRATEGY_LABEL,
         "log_path": os.path.join(log_dir, "v9_games.jsonl"),
         "learning_log_path": os.path.join(log_dir, "v9_learning.log"),
+        "trajectory_log_path": os.path.join(log_dir, "v9_trajectory.jsonl"),
+        "random_seed": RANDOM_SEED,
         "update_opponent_profile": True,
     }
     base_url = os.environ.get("GLEE_API_URL")
@@ -62,7 +71,11 @@ def main() -> None:
                 run_log_path,
             )
             logger.info("Stats: %s", client.stats())
-            client.run(advanced_agent.strategy_v9, concurrency=CONCURRENCY)
+            if RANDOM_SEED is not None:
+                logger.info("Random seed: %s", RANDOM_SEED)
+            client.log_stats_snapshot("start")
+            client.run(advanced_agent.strategy_v9, concurrency=CONCURRENCY, max_time=MAX_TIME, max_games=MAX_GAMES)
+            client.log_stats_snapshot("end")
             logger.info("Run returned; exiting")
             return
         except Exception as exc:
